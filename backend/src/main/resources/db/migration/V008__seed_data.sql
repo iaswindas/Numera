@@ -1,0 +1,12 @@
+INSERT INTO tenants (id, code, name)
+VALUES ('00000000-0000-0000-0000-000000000001', 'default', 'Default Tenant')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO roles (tenant_id, name)
+VALUES ('00000000-0000-0000-0000-000000000001', 'ROLE_ADMIN'),
+       ('00000000-0000-0000-0000-000000000001', 'ROLE_ANALYST')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO users (tenant_id, email, password_hash, full_name, enabled)
+VALUES ('00000000-0000-0000-0000-000000000001', 'admin@numera.ai', '$2a$10$4Zo1KCU8dVS6x6fM2Q7WfO4VhDhXfYim0s6mMTR9AZxM1n1Hh6M6S', 'Demo Admin', true)
+ON CONFLICT DO NOTHING;

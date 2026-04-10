@@ -1,0 +1,28 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPath": "/api/ml/zones/classify"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "document_id": "doc-e2e",
+      "zones": [
+        {
+          "table_id": "table-1",
+          "zone_type": "INCOME_STATEMENT",
+          "zone_label": "Income Statement",
+          "confidence": 0.96,
+          "classification_method": "VLM",
+          "detected_periods": ["2025", "2024"],
+          "detected_currency": "AED",
+          "detected_unit": "thousands"
+        }
+      ],
+      "processing_time_ms": 110
+    }
+  }
+}

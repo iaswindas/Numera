@@ -1,0 +1,64 @@
+# Numera ML Training Configuration
+# Used across all Colab notebooks for consistent hyperparameters
+
+# --- Data ---
+data:
+  edgar_target_companies: 500
+  edgar_years_per_company: 2
+  lse_target_reports: 100
+  gcc_target_reports: 50
+  train_split: 0.8
+  val_split: 0.1
+  test_split: 0.1
+
+# --- LayoutLM Zone Classifier ---
+zone_classifier:
+  model_name: "microsoft/layoutlm-base-uncased"
+  num_labels: 8  # ZoneType enum count
+  max_length: 512
+  learning_rate: 2.0e-5
+  batch_size: 8
+  num_epochs: 10
+  warmup_steps: 100
+  weight_decay: 0.01
+  early_stopping_patience: 3
+  target_accuracy: 0.92
+  checkpoint_interval: 500  # Save every N steps
+  mlflow_experiment: "zone-classifier"
+  mlflow_model_name: "layoutlm-zone-classifier"
+
+# --- Sentence-BERT IFRS Matcher ---
+sbert:
+  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  learning_rate: 2.0e-5
+  batch_size: 32
+  num_epochs: 5
+  warmup_ratio: 0.1
+  evaluation_steps: 200
+  target_accuracy: 0.85
+  mlflow_experiment: "sbert-ifrs"
+  mlflow_model_name: "sbert-ifrs-matcher"
+
+# --- OCR / Table Detection ---
+ocr:
+  dpi: 300
+  batch_size: 4  # Pages per Colab GPU batch
+  min_table_rows: 2
+  min_table_cols: 2
+  table_confidence_threshold: 0.5
+
+# --- MLflow ---
+# Set your DagsHub username below — URI is auto-constructed
+mlflow:
+  dagshub_username: "<your-dagshub-username>"
+  tracking_uri: "https://dagshub.com/<your-dagshub-username>/numera-ml.mlflow"
+  # Local alternative when running MLflow locally:
+  # tracking_uri: "http://localhost:5000"
+
+# --- Google Drive paths ---
+drive:
+  project_root: "/content/drive/MyDrive/numera-ml"
+  data_dir: "/content/drive/MyDrive/numera-ml/data"
+  models_dir: "/content/drive/MyDrive/numera-ml/models"
+  checkpoints_dir: "/content/drive/MyDrive/numera-ml/models/checkpoints"
+  exported_dir: "/content/drive/MyDrive/numera-ml/models/exported"

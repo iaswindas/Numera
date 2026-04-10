@@ -1,0 +1,25 @@
+spring:
+  jpa:
+    show-sql: true
+  flyway:
+    clean-disabled: false
+
+numera:
+  jwt:
+    access-expiration-ms: 900000
+    refresh-expiration-ms: 86400000
+  ml:
+    timeout-ms: 60000
+    retry-max-attempts: 2
+    retry-backoff-ms: 300
+    circuit-breaker-failure-threshold: 2
+    circuit-breaker-open-ms: 5000
+
+logging:
+  level:
+    root: INFO
+    com.numera: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE

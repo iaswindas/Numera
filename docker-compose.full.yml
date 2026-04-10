@@ -1,0 +1,170 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: numera
+      POSTGRES_PASSWORD: numera
+      POSTGRES_DB: numera
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U numera -d numera"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: valkey/valkey:8.0
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb --ignore-existing local/numera-docs;
+      mc anonymous set private local/numera-docs;
+      "
+
+  mlflow:
+    build:
+      context: ./mlflow
+    ports:
+      - "5000:5000"
+    environment:
+      MLFLOW_BACKEND_STORE_URI: sqlite:////mlflow/mlflow.db
+      MLFLOW_DEFAULT_ARTIFACT_ROOT: /mlflow/artifacts
+    volumes:
+      - mlflow-data:/mlflow
+
+  ocr-service:
+    build:
+      context: ./ocr-service
+    ports:
+      - "8001:8001"
+    environment:
+      OCR_PROCESSOR_BACKEND: ${OCR_PROCESSOR_BACKEND:-qwen3vl}
+      OCR_VLM_MODEL_ID: ${OCR_VLM_MODEL_ID:-Qwen/Qwen3-VL-8B-Instruct}
+      OCR_VLM_QUANTIZE: ${OCR_VLM_QUANTIZE:-true}
+      OCR_VLM_DEVICE: ${OCR_VLM_DEVICE:-auto}
+      OCR_LANG: en
+      OCR_USE_GPU: ${OCR_USE_GPU:-false}
+      OCR_MINIO_ENDPOINT: minio:9000
+      OCR_MINIO_ACCESS_KEY: minioadmin
+      OCR_MINIO_SECRET_KEY: minioadmin
+      OCR_MINIO_BUCKET: numera-documents
+    depends_on:
+      minio:
+        condition: service_healthy
+    volumes:
+      - ocr-models:/app/models
+      - ./data/sample_documents:/app/local_storage
+
+  ml-service:
+    build:
+      context: ./ml-service
+    ports:
+      - "8002:8002"
+    environment:
+      ML_MINIO_ENDPOINT: minio:9000
+      ML_MINIO_ACCESS_KEY: minioadmin
+      ML_MINIO_SECRET_KEY: minioadmin
+      ML_MLFLOW_URI: http://mlflow:5000
+      ML_DEVICE: ${ML_DEVICE:-cpu}
+      ML_MODEL_CACHE_DIR: /app/models
+      ML_PG_HOST: postgres
+      ML_PG_PORT: 5432
+      ML_PG_DATABASE: numera
+      ML_PG_USER: numera
+      ML_PG_PASSWORD: numera
+      ML_OCR_SERVICE_URL: http://ocr-service:8001
+      ML_PIPELINE_TIMEOUT_SECONDS: 120
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+      ocr-service:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    volumes:
+      - ml-models:/app/models
+
+  # Backend and frontend run in host dev mode by default in this repo.
+  # Enable these profiles if/when Dockerfiles are added.
+  backend:
+    profiles: ["app"]
+    image: numera/backend:dev
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/numera
+      DB_USER: numera
+      DB_PASSWORD: numera
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: numera-docs
+      OCR_SERVICE_URL: http://ocr-service:8001/api
+      ML_SERVICE_URL: http://ml-service:8002/api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      ocr-service:
+        condition: service_started
+      ml-service:
+        condition: service_started
+
+  numera-ui:
+    profiles: ["app"]
+    image: numera/ui:dev
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080/api
+    depends_on:
+      - backend
+
+volumes:
+  pg-data:
+  minio-data:
+  mlflow-data:
+  ocr-models:
+  ml-models:

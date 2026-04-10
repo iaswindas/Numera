@@ -1,0 +1,71 @@
+spring:
+  threads:
+    virtual:
+      enabled: true
+  application:
+    name: numera-backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/numera}
+    username: ${DB_USER:numera}
+    password: ${DB_PASSWORD:numera}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:30000}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enabled: true
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+
+numera:
+  jwt:
+    secret: ${JWT_SECRET:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+    access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:3600000}
+    refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
+  storage:
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:minioadmin}
+    secret-key: ${MINIO_SECRET_KEY:minioadmin}
+    bucket: ${MINIO_BUCKET:numera-docs}
+  ml:
+    ocr-service-url: ${OCR_SERVICE_URL:http://localhost:8001/api}
+    ml-service-url: ${ML_SERVICE_URL:http://localhost:8002/api}
+    timeout-ms: ${ML_TIMEOUT_MS:120000}
+    retry-max-attempts: ${ML_RETRY_MAX_ATTEMPTS:3}
+    retry-backoff-ms: ${ML_RETRY_BACKOFF_MS:500}
+    circuit-breaker-failure-threshold: ${ML_CB_FAILURE_THRESHOLD:3}
+    circuit-breaker-open-ms: ${ML_CB_OPEN_MS:15000}

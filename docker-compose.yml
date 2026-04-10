@@ -1,0 +1,138 @@
+version: '3.8'
+
+services:
+  ocr-service:
+    build: ./ocr-service
+    ports:
+      - "8001:8001"
+    volumes:
+      - ocr-models:/app/models
+      - ./data/sample_documents:/app/local_storage
+    environment:
+      # Processor backend: "qwen3vl" (SOTA VLM) or "paddleocr" (legacy)
+      - OCR_PROCESSOR_BACKEND=qwen3vl
+      # Qwen3-VL settings
+      - OCR_VLM_MODEL_ID=Qwen/Qwen3-VL-8B-Instruct
+      - OCR_VLM_QUANTIZE=true
+      - OCR_VLM_DEVICE=auto
+      # Legacy PaddleOCR settings
+      - OCR_LANG=en
+      - OCR_USE_GPU=false
+      # Storage
+      - OCR_MINIO_ENDPOINT=minio:9000
+      - OCR_MINIO_ACCESS_KEY=minioadmin
+      - OCR_MINIO_SECRET_KEY=minioadmin
+      - OCR_MINIO_BUCKET=numera-documents
+      - OCR_LOCAL_STORAGE_PATH=/app/local_storage
+    depends_on:
+      - minio
+    networks:
+      - numera-ml
+    deploy:
+      resources:
+        limits:
+          memory: 12g  # Qwen3-VL quantized needs ~8-10GB
+    # GPU support (uncomment when GPU is available)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  ml-service:
+    build: ./ml-service
+    ports:
+      - "8002:8002"
+    volumes:
+      - ml-models:/app/models
+    environment:
+      - ML_MINIO_ENDPOINT=minio:9000
+      - ML_MINIO_ACCESS_KEY=minioadmin
+      - ML_MINIO_SECRET_KEY=minioadmin
+      - ML_MLFLOW_URI=http://mlflow:5000
+      - ML_DEVICE=cpu
+      - ML_MODEL_CACHE_DIR=/app/models
+      # Phase 1: PostgreSQL
+      - ML_PG_HOST=postgres
+      - ML_PG_PORT=5432
+      - ML_PG_DATABASE=numera_ml
+      - ML_PG_USER=numera
+      - ML_PG_PASSWORD=numera
+      # Phase 1: A/B Testing
+      - ML_AB_TEST_ENABLED=false
+      - ML_AB_TEST_STAGING_RATIO=0.10
+      # Phase 1: Client Models
+      - ML_ENABLE_CLIENT_MODELS=false
+      - ML_CLIENT_MODEL_MIN_CORRECTIONS=100
+      # Phase 1: Pipeline
+      - ML_OCR_SERVICE_URL=http://ocr-service:8001
+      - ML_PIPELINE_TIMEOUT_SECONDS=120
+    depends_on:
+      - mlflow
+      - minio
+      - postgres
+    networks:
+      - numera-ml
+    mem_limit: 2g
+
+  mlflow:
+    build: ./mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/mlflow
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=sqlite:////mlflow/mlflow.db
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/mlflow/artifacts
+    networks:
+      - numera-ml
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    networks:
+      - numera-ml
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=numera_ml
+      - POSTGRES_USER=numera
+      - POSTGRES_PASSWORD=numera
+    networks:
+      - numera-ml
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U numera -d numera_ml"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  numera-ml:
+    driver: bridge
+
+volumes:
+  ocr-models:
+  ml-models:
+  mlflow-data:
+  minio-data:
+  pg-data:

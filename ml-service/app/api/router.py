@@ -1,0 +1,20 @@
+"""ML Service API router — mounts all sub-routers."""
+
+from fastapi import APIRouter
+
+from .health import router as health_router
+from .zones import router as zones_router
+from .mapping import router as mapping_router
+from .feedback import router as feedback_router
+from .pipeline import router as pipeline_router
+from .expressions import router as expressions_router
+
+router = APIRouter()
+
+router.include_router(health_router, prefix="/ml", tags=["health"])
+router.include_router(zones_router, prefix="/ml/zones", tags=["zones"])
+router.include_router(mapping_router, prefix="/ml/mapping", tags=["mapping"])
+router.include_router(feedback_router, prefix="/ml", tags=["feedback"])
+router.include_router(pipeline_router, prefix="/ml/pipeline", tags=["pipeline"])
+router.include_router(expressions_router, prefix="/ml/expressions", tags=["expressions"])
+

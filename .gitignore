@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+*/node_modules/
+backend/.gradle/
+backend/build/
+ml-service/__pycache__/
+ml-service/.venv/
+ml-service/venv/
+ocr-service/__pycache__/
+ocr-service/.venv/
+ocr-service/venv/
+
+# Build outputs
+numera-ui/.next/
+numera-ui/dist/
+numera-ui/out/
+*.egg-info/
+dist/
+build/
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Runtime data
+mlflow/mlflow.db
+mlflow/artifacts/
+
+# Test cache
+.pytest_cache/
+.mypy_cache/
+.coverage
+
+# Gradle wrapper dist
+gradle/wrapper/dists/
+
+# Log files
+*.log
+
+# Python
+__pycache__/
+.Python
+*.pyc
+

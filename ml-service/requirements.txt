@@ -1,0 +1,23 @@
+# Framework
+fastapi==0.115.*
+uvicorn[standard]==0.34.*
+pydantic==2.11.*
+pydantic-settings==2.8.*
+
+# PyTorch ML Stack
+torch==2.6.*
+transformers==4.50.*
+sentence-transformers==4.0.*
+tokenizers==0.21.*
+
+# Utilities
+numpy==2.2.*
+scikit-learn==1.6.*
+httpx==0.28.*
+python-multipart==0.0.*
+orjson==3.10.*
+boto3==1.37.*
+mlflow-skinny==2.18.*
+
+# Phase 1: PostgreSQL (feedback persistence)
+asyncpg==0.30.*

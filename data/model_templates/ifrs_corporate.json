@@ -1,0 +1,217 @@
+{
+  "_meta": {
+    "id": "ifrs-corporate-v1",
+    "name": "IFRS Corporate Standard",
+    "description": "Standard IFRS model template for corporate credit analysis. ~200 line items.",
+    "version": 1,
+    "framework": "IFRS",
+    "total_items": 195,
+    "zones": ["BALANCE_SHEET", "INCOME_STATEMENT", "CASH_FLOW", "RATIOS"]
+  },
+
+  "sections": [
+    {
+      "zone_type": "INCOME_STATEMENT",
+      "label": "Income Statement",
+      "items": [
+        {"id": "IS001", "label": "Revenue", "type": "INPUT", "required": true, "indent": 0, "synonyms": ["Turnover", "Net Sales", "Total Revenue", "Sales Revenue"]},
+        {"id": "IS002", "label": "Cost of Sales", "type": "INPUT", "required": true, "indent": 0, "sign": "NEGATIVE", "synonyms": ["COGS", "Cost of Goods Sold", "Cost of Revenue"]},
+        {"id": "IS003", "label": "Gross Profit", "type": "FORMULA", "formula": "{IS001} - {IS002}", "indent": 0, "is_total": true},
+        {"id": "IS004", "label": "Gross Profit Margin %", "type": "FORMULA", "formula": "{IS003} / {IS001} * 100", "indent": 1, "format": "PERCENTAGE"},
+
+        {"id": "IS010", "label": "Distribution Costs", "type": "INPUT", "indent": 0, "sign": "NEGATIVE", "synonyms": ["Selling Expenses", "Marketing Expenses"]},
+        {"id": "IS011", "label": "Administrative Expenses", "type": "INPUT", "indent": 0, "sign": "NEGATIVE", "synonyms": ["G&A Expenses", "General and Administrative"]},
+        {"id": "IS012", "label": "Research and Development", "type": "INPUT", "indent": 0, "sign": "NEGATIVE", "synonyms": ["R&D Expenses", "R&D Costs"]},
+        {"id": "IS013", "label": "Other Operating Income", "type": "INPUT", "indent": 0, "synonyms": ["Other Income", "Miscellaneous Income"]},
+        {"id": "IS014", "label": "Other Operating Expenses", "type": "INPUT", "indent": 0, "sign": "NEGATIVE", "synonyms": ["Other Expenses"]},
+        {"id": "IS015", "label": "Depreciation and Amortisation", "type": "INPUT", "indent": 0, "sign": "NEGATIVE", "synonyms": ["D&A", "Depreciation", "Amortisation"]},
+
+        {"id": "IS020", "label": "Operating Profit", "type": "FORMULA", "formula": "{IS003} - {IS010} - {IS011} - {IS012} + {IS013} - {IS014}", "indent": 0, "is_total": true, "synonyms": ["EBIT", "Operating Income"]},
+        {"id": "IS021", "label": "Operating Margin %", "type": "FORMULA", "formula": "{IS020} / {IS001} * 100", "indent": 1, "format": "PERCENTAGE"},
+        {"id": "IS022", "label": "EBITDA", "type": "FORMULA", "formula": "{IS020} + {IS015}", "indent": 0, "is_total": true},
+        {"id": "IS023", "label": "EBITDA Margin %", "type": "FORMULA", "formula": "{IS022} / {IS001} * 100", "indent": 1, "format": "PERCENTAGE"},
+
+        {"id": "IS030", "label": "Finance Income", "type": "INPUT", "indent": 0, "synonyms": ["Interest Income", "Investment Income"]},
+        {"id": "IS031", "label": "Finance Costs", "type": "INPUT", "indent": 0, "sign": "NEGATIVE", "synonyms": ["Interest Expense", "Borrowing Costs"]},
+        {"id": "IS032", "label": "Net Finance Costs", "type": "FORMULA", "formula": "{IS030} - {IS031}", "indent": 0},
+        {"id": "IS033", "label": "Share of Profit of Associates", "type": "INPUT", "indent": 0, "synonyms": ["Equity Method Income"]},
+        {"id": "IS034", "label": "Impairment Losses", "type": "INPUT", "indent": 0, "sign": "NEGATIVE", "synonyms": ["Impairment Charges", "Write-downs"]},
+
+        {"id": "IS040", "label": "Profit Before Tax", "type": "FORMULA", "formula": "{IS020} + {IS032} + {IS033} - {IS034}", "indent": 0, "is_total": true, "synonyms": ["PBT"]},
+        {"id": "IS041", "label": "Income Tax Expense", "type": "INPUT", "indent": 0, "sign": "NEGATIVE", "synonyms": ["Tax Expense", "Tax Charge", "Provision for Taxation"]},
+        {"id": "IS042", "label": "Effective Tax Rate %", "type": "FORMULA", "formula": "{IS041} / {IS040} * 100", "indent": 1, "format": "PERCENTAGE"},
+
+        {"id": "IS050", "label": "Profit for the Year", "type": "FORMULA", "formula": "{IS040} - {IS041}", "indent": 0, "is_total": true, "synonyms": ["Net Income", "Net Profit", "PAT"]},
+        {"id": "IS051", "label": "Net Profit Margin %", "type": "FORMULA", "formula": "{IS050} / {IS001} * 100", "indent": 1, "format": "PERCENTAGE"},
+        {"id": "IS052", "label": "Profit Attributable to Owners", "type": "INPUT", "indent": 1, "synonyms": ["Owners of the Parent"]},
+        {"id": "IS053", "label": "Profit Attributable to NCI", "type": "INPUT", "indent": 1, "synonyms": ["Non-controlling Interests"]},
+        {"id": "IS054", "label": "Basic EPS", "type": "INPUT", "indent": 0, "synonyms": ["Earnings Per Share"]},
+        {"id": "IS055", "label": "Diluted EPS", "type": "INPUT", "indent": 0},
+        {"id": "IS056", "label": "Dividends Per Share", "type": "INPUT", "indent": 0, "synonyms": ["DPS"]},
+
+        {"id": "IS060", "label": "Other Comprehensive Income", "type": "INPUT", "indent": 0, "synonyms": ["OCI"]},
+        {"id": "IS061", "label": "Total Comprehensive Income", "type": "FORMULA", "formula": "{IS050} + {IS060}", "indent": 0, "is_total": true}
+      ]
+    },
+
+    {
+      "zone_type": "BALANCE_SHEET",
+      "label": "Balance Sheet",
+      "items": [
+        {"id": "BS_CA_HEADER", "label": "Current Assets", "type": "CATEGORY", "indent": 0},
+        {"id": "BS001", "label": "Cash and Cash Equivalents", "type": "INPUT", "required": true, "indent": 1, "category": "Current Assets", "synonyms": ["Cash", "Cash at Bank"]},
+        {"id": "BS002", "label": "Short-term Investments", "type": "INPUT", "indent": 1, "category": "Current Assets", "synonyms": ["Short-term Deposits", "Term Deposits"]},
+        {"id": "BS003", "label": "Trade Receivables", "type": "INPUT", "indent": 1, "category": "Current Assets", "synonyms": ["Accounts Receivable", "Debtors"]},
+        {"id": "BS004", "label": "Inventories", "type": "INPUT", "indent": 1, "category": "Current Assets", "synonyms": ["Inventory", "Stock"]},
+        {"id": "BS005", "label": "Prepayments", "type": "INPUT", "indent": 1, "category": "Current Assets", "synonyms": ["Prepaid Expenses"]},
+        {"id": "BS006", "label": "Contract Assets", "type": "INPUT", "indent": 1, "category": "Current Assets"},
+        {"id": "BS007", "label": "Other Current Assets", "type": "INPUT", "indent": 1, "category": "Current Assets"},
+        {"id": "BS010", "label": "Total Current Assets", "type": "FORMULA", "formula": "SUM({BS001}:{BS007})", "indent": 0, "is_total": true, "category": "Current Assets"},
+
+        {"id": "BS_NCA_HEADER", "label": "Non-Current Assets", "type": "CATEGORY", "indent": 0},
+        {"id": "BS020", "label": "Property Plant and Equipment", "type": "INPUT", "indent": 1, "category": "Non-Current Assets", "synonyms": ["PPE", "Fixed Assets"]},
+        {"id": "BS021", "label": "Intangible Assets", "type": "INPUT", "indent": 1, "category": "Non-Current Assets", "synonyms": ["Intangibles"]},
+        {"id": "BS022", "label": "Goodwill", "type": "INPUT", "indent": 1, "category": "Non-Current Assets"},
+        {"id": "BS023", "label": "Investment Property", "type": "INPUT", "indent": 1, "category": "Non-Current Assets"},
+        {"id": "BS024", "label": "Right-of-Use Assets", "type": "INPUT", "indent": 1, "category": "Non-Current Assets", "synonyms": ["ROU Assets", "Lease Assets"]},
+        {"id": "BS025", "label": "Investments in Associates", "type": "INPUT", "indent": 1, "category": "Non-Current Assets"},
+        {"id": "BS026", "label": "Long-term Investments", "type": "INPUT", "indent": 1, "category": "Non-Current Assets"},
+        {"id": "BS027", "label": "Deferred Tax Assets", "type": "INPUT", "indent": 1, "category": "Non-Current Assets"},
+        {"id": "BS028", "label": "Other Non-Current Assets", "type": "INPUT", "indent": 1, "category": "Non-Current Assets"},
+        {"id": "BS030", "label": "Total Non-Current Assets", "type": "FORMULA", "formula": "SUM({BS020}:{BS028})", "indent": 0, "is_total": true, "category": "Non-Current Assets"},
+
+        {"id": "BS035", "label": "Total Assets", "type": "FORMULA", "formula": "{BS010} + {BS030}", "indent": 0, "is_total": true, "required": true},
+
+        {"id": "BS_CL_HEADER", "label": "Current Liabilities", "type": "CATEGORY", "indent": 0},
+        {"id": "BS040", "label": "Trade Payables", "type": "INPUT", "indent": 1, "category": "Current Liabilities", "synonyms": ["Accounts Payable", "Creditors"]},
+        {"id": "BS041", "label": "Short-term Borrowings", "type": "INPUT", "indent": 1, "category": "Current Liabilities", "synonyms": ["Bank Overdraft", "Short-term Loans"]},
+        {"id": "BS042", "label": "Current Portion of Long-term Debt", "type": "INPUT", "indent": 1, "category": "Current Liabilities", "synonyms": ["CPLTD"]},
+        {"id": "BS043", "label": "Accrued Expenses", "type": "INPUT", "indent": 1, "category": "Current Liabilities", "synonyms": ["Accruals"]},
+        {"id": "BS044", "label": "Tax Payable", "type": "INPUT", "indent": 1, "category": "Current Liabilities", "synonyms": ["Income Tax Payable"]},
+        {"id": "BS045", "label": "Contract Liabilities", "type": "INPUT", "indent": 1, "category": "Current Liabilities", "synonyms": ["Deferred Revenue", "Unearned Revenue"]},
+        {"id": "BS046", "label": "Provisions (Current)", "type": "INPUT", "indent": 1, "category": "Current Liabilities"},
+        {"id": "BS047", "label": "Other Current Liabilities", "type": "INPUT", "indent": 1, "category": "Current Liabilities"},
+        {"id": "BS050", "label": "Total Current Liabilities", "type": "FORMULA", "formula": "SUM({BS040}:{BS047})", "indent": 0, "is_total": true, "category": "Current Liabilities"},
+
+        {"id": "BS_NCL_HEADER", "label": "Non-Current Liabilities", "type": "CATEGORY", "indent": 0},
+        {"id": "BS060", "label": "Long-term Borrowings", "type": "INPUT", "indent": 1, "category": "Non-Current Liabilities", "synonyms": ["Long-term Debt", "Term Loans", "Bonds Payable"]},
+        {"id": "BS061", "label": "Lease Liabilities", "type": "INPUT", "indent": 1, "category": "Non-Current Liabilities"},
+        {"id": "BS062", "label": "Deferred Tax Liabilities", "type": "INPUT", "indent": 1, "category": "Non-Current Liabilities"},
+        {"id": "BS063", "label": "Pension Obligations", "type": "INPUT", "indent": 1, "category": "Non-Current Liabilities", "synonyms": ["Retirement Benefit Obligations"]},
+        {"id": "BS064", "label": "Provisions (Non-Current)", "type": "INPUT", "indent": 1, "category": "Non-Current Liabilities"},
+        {"id": "BS065", "label": "Other Non-Current Liabilities", "type": "INPUT", "indent": 1, "category": "Non-Current Liabilities"},
+        {"id": "BS070", "label": "Total Non-Current Liabilities", "type": "FORMULA", "formula": "SUM({BS060}:{BS065})", "indent": 0, "is_total": true, "category": "Non-Current Liabilities"},
+
+        {"id": "BS075", "label": "Total Liabilities", "type": "FORMULA", "formula": "{BS050} + {BS070}", "indent": 0, "is_total": true},
+
+        {"id": "BS_EQ_HEADER", "label": "Equity", "type": "CATEGORY", "indent": 0},
+        {"id": "BS080", "label": "Share Capital", "type": "INPUT", "indent": 1, "category": "Equity", "synonyms": ["Issued Capital", "Common Stock"]},
+        {"id": "BS081", "label": "Share Premium", "type": "INPUT", "indent": 1, "category": "Equity", "synonyms": ["Additional Paid-in Capital"]},
+        {"id": "BS082", "label": "Retained Earnings", "type": "INPUT", "indent": 1, "category": "Equity", "synonyms": ["Accumulated Profits", "Retained Profits"]},
+        {"id": "BS083", "label": "Other Reserves", "type": "INPUT", "indent": 1, "category": "Equity", "synonyms": ["Capital Reserves", "Revaluation Reserve"]},
+        {"id": "BS084", "label": "Treasury Shares", "type": "INPUT", "indent": 1, "category": "Equity", "sign": "NEGATIVE", "synonyms": ["Treasury Stock"]},
+        {"id": "BS085", "label": "Equity Attributable to Owners", "type": "FORMULA", "formula": "SUM({BS080}:{BS084})", "indent": 0, "is_total": true},
+        {"id": "BS086", "label": "Non-Controlling Interests", "type": "INPUT", "indent": 1, "category": "Equity", "synonyms": ["Minority Interests", "NCI"]},
+        {"id": "BS090", "label": "Total Equity", "type": "FORMULA", "formula": "{BS085} + {BS086}", "indent": 0, "is_total": true},
+
+        {"id": "BS095", "label": "Total Liabilities and Equity", "type": "FORMULA", "formula": "{BS075} + {BS090}", "indent": 0, "is_total": true}
+      ]
+    },
+
+    {
+      "zone_type": "CASH_FLOW",
+      "label": "Cash Flow Statement",
+      "items": [
+        {"id": "CF_OP_HEADER", "label": "Operating Activities", "type": "CATEGORY", "indent": 0},
+        {"id": "CF001", "label": "Profit Before Tax", "type": "INPUT", "indent": 1, "synonyms": ["PBT"]},
+        {"id": "CF_ADJ_HEADER", "label": "Adjustments", "type": "CATEGORY", "indent": 1},
+        {"id": "CF010", "label": "Depreciation", "type": "INPUT", "indent": 2},
+        {"id": "CF011", "label": "Amortisation", "type": "INPUT", "indent": 2},
+        {"id": "CF012", "label": "Impairment", "type": "INPUT", "indent": 2, "synonyms": ["Write-downs"]},
+        {"id": "CF013", "label": "Finance Costs Adjustment", "type": "INPUT", "indent": 2},
+        {"id": "CF014", "label": "Share-based Payment", "type": "INPUT", "indent": 2, "synonyms": ["Stock Compensation"]},
+        {"id": "CF015", "label": "Gain/Loss on Disposal", "type": "INPUT", "indent": 2},
+        {"id": "CF016", "label": "Other Adjustments", "type": "INPUT", "indent": 2},
+        {"id": "CF_WC_HEADER", "label": "Working Capital Changes", "type": "CATEGORY", "indent": 1},
+        {"id": "CF020", "label": "Change in Inventories", "type": "INPUT", "indent": 2},
+        {"id": "CF021", "label": "Change in Trade Receivables", "type": "INPUT", "indent": 2},
+        {"id": "CF022", "label": "Change in Trade Payables", "type": "INPUT", "indent": 2},
+        {"id": "CF023", "label": "Change in Other Working Capital", "type": "INPUT", "indent": 2},
+        {"id": "CF030", "label": "Cash Generated from Operations", "type": "FORMULA", "formula": "{CF001} + SUM({CF010}:{CF016}) + SUM({CF020}:{CF023})", "indent": 1, "is_total": true},
+        {"id": "CF031", "label": "Income Tax Paid", "type": "INPUT", "indent": 1, "sign": "NEGATIVE"},
+        {"id": "CF032", "label": "Interest Paid", "type": "INPUT", "indent": 1, "sign": "NEGATIVE"},
+        {"id": "CF035", "label": "Cash from Operating Activities", "type": "FORMULA", "formula": "{CF030} - {CF031} - {CF032}", "indent": 0, "is_total": true, "required": true},
+
+        {"id": "CF_INV_HEADER", "label": "Investing Activities", "type": "CATEGORY", "indent": 0},
+        {"id": "CF040", "label": "Purchase of PPE", "type": "INPUT", "indent": 1, "sign": "NEGATIVE", "synonyms": ["Capital Expenditure", "Capex"]},
+        {"id": "CF041", "label": "Purchase of Intangibles", "type": "INPUT", "indent": 1, "sign": "NEGATIVE"},
+        {"id": "CF042", "label": "Proceeds from Sale of Assets", "type": "INPUT", "indent": 1},
+        {"id": "CF043", "label": "Acquisition of Subsidiaries", "type": "INPUT", "indent": 1, "sign": "NEGATIVE"},
+        {"id": "CF044", "label": "Purchase of Investments", "type": "INPUT", "indent": 1, "sign": "NEGATIVE"},
+        {"id": "CF045", "label": "Proceeds from Sale of Investments", "type": "INPUT", "indent": 1},
+        {"id": "CF046", "label": "Interest Received", "type": "INPUT", "indent": 1},
+        {"id": "CF047", "label": "Other Investing Activities", "type": "INPUT", "indent": 1},
+        {"id": "CF050", "label": "Cash from Investing Activities", "type": "FORMULA", "formula": "SUM({CF040}:{CF047})", "indent": 0, "is_total": true, "required": true},
+
+        {"id": "CF_FIN_HEADER", "label": "Financing Activities", "type": "CATEGORY", "indent": 0},
+        {"id": "CF060", "label": "Proceeds from Borrowings", "type": "INPUT", "indent": 1},
+        {"id": "CF061", "label": "Repayment of Borrowings", "type": "INPUT", "indent": 1, "sign": "NEGATIVE"},
+        {"id": "CF062", "label": "Lease Payments", "type": "INPUT", "indent": 1, "sign": "NEGATIVE"},
+        {"id": "CF063", "label": "Dividends Paid", "type": "INPUT", "indent": 1, "sign": "NEGATIVE"},
+        {"id": "CF064", "label": "Proceeds from Share Issue", "type": "INPUT", "indent": 1},
+        {"id": "CF065", "label": "Purchase of Treasury Shares", "type": "INPUT", "indent": 1, "sign": "NEGATIVE"},
+        {"id": "CF066", "label": "Other Financing Activities", "type": "INPUT", "indent": 1},
+        {"id": "CF070", "label": "Cash from Financing Activities", "type": "FORMULA", "formula": "SUM({CF060}:{CF066})", "indent": 0, "is_total": true, "required": true},
+
+        {"id": "CF080", "label": "Net Change in Cash", "type": "FORMULA", "formula": "{CF035} + {CF050} + {CF070}", "indent": 0, "is_total": true},
+        {"id": "CF081", "label": "Opening Cash", "type": "INPUT", "indent": 0},
+        {"id": "CF082", "label": "Exchange Rate Effects", "type": "INPUT", "indent": 0},
+        {"id": "CF085", "label": "Closing Cash", "type": "FORMULA", "formula": "{CF081} + {CF080} + {CF082}", "indent": 0, "is_total": true}
+      ]
+    },
+
+    {
+      "zone_type": "RATIOS",
+      "label": "Key Financial Ratios",
+      "items": [
+        {"id": "RA_LIQ_HEADER", "label": "Liquidity Ratios", "type": "CATEGORY", "indent": 0},
+        {"id": "RA001", "label": "Current Ratio", "type": "FORMULA", "formula": "{BS010} / {BS050}", "indent": 1, "format": "RATIO"},
+        {"id": "RA002", "label": "Quick Ratio", "type": "FORMULA", "formula": "({BS010} - {BS004}) / {BS050}", "indent": 1, "format": "RATIO"},
+        {"id": "RA003", "label": "Working Capital", "type": "FORMULA", "formula": "{BS010} - {BS050}", "indent": 1},
+
+        {"id": "RA_LEV_HEADER", "label": "Leverage Ratios", "type": "CATEGORY", "indent": 0},
+        {"id": "RA010", "label": "Debt to Equity", "type": "FORMULA", "formula": "{BS075} / {BS090}", "indent": 1, "format": "RATIO"},
+        {"id": "RA011", "label": "Debt to EBITDA", "type": "FORMULA", "formula": "({BS060} + {BS041}) / {IS022}", "indent": 1, "format": "RATIO"},
+        {"id": "RA012", "label": "Interest Coverage", "type": "FORMULA", "formula": "{IS020} / {IS031}", "indent": 1, "format": "RATIO"},
+        {"id": "RA013", "label": "Net Debt", "type": "FORMULA", "formula": "{BS060} + {BS041} - {BS001}", "indent": 1},
+        {"id": "RA014", "label": "Net Debt to EBITDA", "type": "FORMULA", "formula": "{RA013} / {IS022}", "indent": 1, "format": "RATIO"},
+        {"id": "RA015", "label": "Equity Ratio", "type": "FORMULA", "formula": "{BS090} / {BS035}", "indent": 1, "format": "PERCENTAGE"},
+
+        {"id": "RA_PROF_HEADER", "label": "Profitability Ratios", "type": "CATEGORY", "indent": 0},
+        {"id": "RA020", "label": "Return on Equity", "type": "FORMULA", "formula": "{IS050} / {BS090} * 100", "indent": 1, "format": "PERCENTAGE"},
+        {"id": "RA021", "label": "Return on Assets", "type": "FORMULA", "formula": "{IS050} / {BS035} * 100", "indent": 1, "format": "PERCENTAGE"},
+
+        {"id": "RA_EFF_HEADER", "label": "Efficiency Ratios", "type": "CATEGORY", "indent": 0},
+        {"id": "RA030", "label": "Asset Turnover", "type": "FORMULA", "formula": "{IS001} / {BS035}", "indent": 1, "format": "RATIO"},
+        {"id": "RA031", "label": "Inventory Days", "type": "FORMULA", "formula": "{BS004} / {IS002} * 365", "indent": 1, "format": "DAYS"},
+        {"id": "RA032", "label": "Receivable Days", "type": "FORMULA", "formula": "{BS003} / {IS001} * 365", "indent": 1, "format": "DAYS"},
+        {"id": "RA033", "label": "Payable Days", "type": "FORMULA", "formula": "{BS040} / {IS002} * 365", "indent": 1, "format": "DAYS"},
+        {"id": "RA034", "label": "Cash Conversion Cycle", "type": "FORMULA", "formula": "{RA031} + {RA032} - {RA033}", "indent": 1, "format": "DAYS"},
+
+        {"id": "RA_CF_HEADER", "label": "Cash Flow Ratios", "type": "CATEGORY", "indent": 0},
+        {"id": "RA040", "label": "Free Cash Flow", "type": "FORMULA", "formula": "{CF035} + {CF040}", "indent": 1},
+        {"id": "RA041", "label": "Cash Flow to Debt", "type": "FORMULA", "formula": "{CF035} / ({BS060} + {BS041})", "indent": 1, "format": "RATIO"}
+      ]
+    }
+  ],
+
+  "validations": [
+    {"id": "VAL001", "name": "Balance Sheet Check", "formula": "{BS035} - {BS095}", "expected": 0, "tolerance": 1, "severity": "ERROR"},
+    {"id": "VAL002", "name": "Profit Attribution", "formula": "{IS050} - {IS052} - {IS053}", "expected": 0, "tolerance": 1, "severity": "WARNING"},
+    {"id": "VAL003", "name": "Cash Flow to Balance Sheet", "formula": "{CF085} - {BS001}", "expected": 0, "tolerance": 1, "severity": "WARNING"},
+    {"id": "VAL004", "name": "Total Assets = L+E", "formula": "{BS035} - {BS075} - {BS090}", "expected": 0, "tolerance": 1, "severity": "ERROR"},
+    {"id": "VAL005", "name": "Cash Flow Reconciliation", "formula": "{CF080} - ({CF085} - {CF081} - {CF082})", "expected": 0, "tolerance": 1, "severity": "ERROR"},
+    {"id": "VAL006", "name": "Gross Profit Check", "formula": "{IS003} - ({IS001} - {IS002})", "expected": 0, "tolerance": 1, "severity": "ERROR"},
+    {"id": "VAL007", "name": "Net Profit Check", "formula": "{IS050} - ({IS040} - {IS041})", "expected": 0, "tolerance": 1, "severity": "ERROR"}
+  ]
+}

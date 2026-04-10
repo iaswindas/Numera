@@ -1,0 +1,29 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPath": "/api/ocr/tables/detect"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "document_id": "doc-e2e",
+      "total_pages": 2,
+      "tables_detected": 1,
+      "tables_filtered": 0,
+      "tables": [
+        {
+          "table_id": "table-1",
+          "page": 1,
+          "row_count": 12,
+          "cells": []
+        }
+      ],
+      "processing_time_ms": 95,
+      "backend": "native",
+      "pdf_type": "native"
+    }
+  }
+}

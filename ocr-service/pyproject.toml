@@ -1,0 +1,6 @@
+[project]
+name = "ocr-service"
+version = "0.1.0"
+description = "PaddlePaddle OCR Service"
+requires-python = ">=3.11"
+dependencies = []

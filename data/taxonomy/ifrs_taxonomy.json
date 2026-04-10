@@ -1,0 +1,687 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "description": "IFRS financial term taxonomy with synonyms for semantic matching",
+    "total_terms": 180,
+    "languages": ["en"],
+    "sources": ["IFRS Foundation Taxonomy 2024", "SEC EDGAR XBRL", "Common financial statement terminology"]
+  },
+
+  "INCOME_STATEMENT": {
+    "Revenue": {
+      "synonyms": ["Turnover", "Net Sales", "Total Revenue", "Sales Revenue", "Revenue from contracts with customers", "Revenue from operations", "Net Revenue", "Operating Revenue", "Sales", "Gross Revenue", "Top Line", "Total Income from Operations"],
+      "sign": "positive",
+      "is_total": false
+    },
+    "Cost of Sales": {
+      "synonyms": ["Cost of Goods Sold", "COGS", "Cost of Revenue", "Direct Costs", "Cost of Products Sold", "Cost of Services", "Cost of Merchandise Sold", "Manufacturing Costs"],
+      "sign": "negative",
+      "is_total": false
+    },
+    "Gross Profit": {
+      "synonyms": ["Gross Margin", "Gross Income", "Gross Surplus"],
+      "sign": "positive",
+      "is_total": true,
+      "formula": "Revenue - Cost of Sales"
+    },
+    "Distribution Costs": {
+      "synonyms": ["Selling Expenses", "Marketing Expenses", "Selling and Distribution Expenses", "Sales and Marketing", "Commercial Expenses"],
+      "sign": "negative",
+      "is_total": false
+    },
+    "Administrative Expenses": {
+      "synonyms": ["General and Administrative Expenses", "G&A Expenses", "Admin Expenses", "Management Expenses", "Corporate Expenses", "General Administrative Expenses", "SG&A"],
+      "sign": "negative",
+      "is_total": false
+    },
+    "Other Operating Income": {
+      "synonyms": ["Other Income", "Miscellaneous Income", "Non-operating Income", "Sundry Income", "Other Revenue"],
+      "sign": "positive",
+      "is_total": false
+    },
+    "Other Operating Expenses": {
+      "synonyms": ["Other Expenses", "Miscellaneous Expenses", "Sundry Expenses", "Non-recurring Expenses"],
+      "sign": "negative",
+      "is_total": false
+    },
+    "Operating Profit": {
+      "synonyms": ["EBIT", "Earnings Before Interest and Tax", "Operating Income", "Operating Earnings", "Profit from Operations", "Results from Operating Activities"],
+      "sign": "positive",
+      "is_total": true,
+      "formula": "Gross Profit - Distribution Costs - Administrative Expenses + Other Operating Income - Other Operating Expenses"
+    },
+    "Finance Income": {
+      "synonyms": ["Interest Income", "Investment Income", "Financial Income", "Income from Investments", "Interest Earned", "Bank Interest Received"],
+      "sign": "positive",
+      "is_total": false
+    },
+    "Finance Costs": {
+      "synonyms": ["Interest Expense", "Financial Expenses", "Borrowing Costs", "Interest Paid", "Finance Charges", "Interest on Borrowings", "Bank Charges", "Interest and Finance Costs"],
+      "sign": "negative",
+      "is_total": false
+    },
+    "Net Finance Costs": {
+      "synonyms": ["Net Financial Expenses", "Net Interest Expense", "Net Finance Income/(Costs)"],
+      "sign": "negative",
+      "is_total": true,
+      "formula": "Finance Income - Finance Costs"
+    },
+    "Share of Profit of Associates": {
+      "synonyms": ["Share of Results of Associates", "Equity Method Income", "Income from Associates", "Share of Profit from Joint Ventures"],
+      "sign": "positive",
+      "is_total": false
+    },
+    "Impairment Losses": {
+      "synonyms": ["Impairment Charges", "Write-downs", "Asset Impairment", "Impairment of Assets"],
+      "sign": "negative",
+      "is_total": false
+    },
+    "Profit Before Tax": {
+      "synonyms": ["PBT", "Earnings Before Tax", "Income Before Tax", "Pre-tax Profit", "Profit Before Income Tax", "Pre-tax Income"],
+      "sign": "positive",
+      "is_total": true,
+      "formula": "Operating Profit + Net Finance Costs + Share of Profit of Associates - Impairment Losses"
+    },
+    "Income Tax Expense": {
+      "synonyms": ["Tax Expense", "Provision for Taxation", "Income Taxes", "Corporate Tax", "Tax Charge", "Current Tax", "Tax"],
+      "sign": "negative",
+      "is_total": false
+    },
+    "Profit for the Year": {
+      "synonyms": ["Net Profit", "Net Income", "Profit After Tax", "PAT", "Net Earnings", "Bottom Line", "Profit for the Period", "Net Profit for the Year"],
+      "sign": "positive",
+      "is_total": true,
+      "formula": "Profit Before Tax - Income Tax Expense"
+    },
+    "Profit Attributable to Owners": {
+      "synonyms": ["Profit Attributable to Equity Holders", "Profit Attributable to Shareholders", "Owners of the Parent"],
+      "sign": "positive",
+      "is_total": false
+    },
+    "Profit Attributable to NCI": {
+      "synonyms": ["Non-controlling Interests Share", "Minority Interest Share", "NCI Share of Profit"],
+      "sign": "positive",
+      "is_total": false
+    },
+    "Depreciation and Amortisation": {
+      "synonyms": ["Depreciation", "Amortisation", "D&A", "Depreciation Expense", "Amortisation Expense", "Depreciation and Amortization"],
+      "sign": "negative",
+      "is_total": false
+    },
+    "EBITDA": {
+      "synonyms": ["Earnings Before Interest Tax Depreciation and Amortisation", "Operating EBITDA", "Adjusted EBITDA"],
+      "sign": "positive",
+      "is_total": true,
+      "formula": "Operating Profit + Depreciation and Amortisation"
+    },
+    "Basic EPS": {
+      "synonyms": ["Basic Earnings Per Share", "EPS Basic", "Earnings Per Share"],
+      "sign": "positive",
+      "is_total": false
+    },
+    "Diluted EPS": {
+      "synonyms": ["Diluted Earnings Per Share", "EPS Diluted"],
+      "sign": "positive",
+      "is_total": false
+    },
+    "Other Comprehensive Income": {
+      "synonyms": ["OCI", "Other Comprehensive Income/(Loss)", "Items that will not be reclassified", "Items that may be reclassified"],
+      "sign": "positive",
+      "is_total": false
+    },
+    "Total Comprehensive Income": {
+      "synonyms": ["Total Comprehensive Income for the Year", "Comprehensive Income"],
+      "sign": "positive",
+      "is_total": true,
+      "formula": "Profit for the Year + Other Comprehensive Income"
+    }
+  },
+
+  "BALANCE_SHEET": {
+    "Cash and Cash Equivalents": {
+      "synonyms": ["Cash", "Cash at Bank", "Cash and Bank Balances", "Liquid Assets", "Cash on Hand", "Bank Balances", "Cash in Hand", "Balances with Banks"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Current Assets"
+    },
+    "Short-term Investments": {
+      "synonyms": ["Short-term Deposits", "Term Deposits", "Fixed Deposits", "Marketable Securities", "Current Investments", "Treasury Bills"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Current Assets"
+    },
+    "Trade Receivables": {
+      "synonyms": ["Accounts Receivable", "Trade and Other Receivables", "Debtors", "Amount Due from Customers", "Trade Debtors", "Receivables", "Amounts Receivable"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Current Assets"
+    },
+    "Inventories": {
+      "synonyms": ["Inventory", "Stock", "Stocks", "Merchandise", "Raw Materials", "Work in Progress", "Finished Goods"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Current Assets"
+    },
+    "Prepayments": {
+      "synonyms": ["Prepaid Expenses", "Advance Payments", "Prepayments and Accrued Income", "Prepaid Assets"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Current Assets"
+    },
+    "Other Current Assets": {
+      "synonyms": ["Sundry Current Assets", "Miscellaneous Current Assets", "Other Receivables"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Current Assets"
+    },
+    "Total Current Assets": {
+      "synonyms": ["Current Assets Total", "Total Current Assets"],
+      "sign": "positive",
+      "is_total": true,
+      "category": "Current Assets",
+      "formula": "SUM(Current Assets)"
+    },
+    "Property Plant and Equipment": {
+      "synonyms": ["PPE", "Fixed Assets", "Tangible Assets", "Property and Equipment", "Land and Buildings", "Plant and Machinery", "Capital Assets", "Tangible Fixed Assets"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Non-Current Assets"
+    },
+    "Intangible Assets": {
+      "synonyms": ["Intangibles", "Software", "Patents", "Trademarks", "Licenses", "Development Costs"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Non-Current Assets"
+    },
+    "Goodwill": {
+      "synonyms": ["Goodwill on Acquisition", "Purchased Goodwill"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Non-Current Assets"
+    },
+    "Investment Property": {
+      "synonyms": ["Investment Properties", "Real Estate Investments"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Non-Current Assets"
+    },
+    "Right-of-Use Assets": {
+      "synonyms": ["ROU Assets", "Lease Assets", "Right of Use Assets", "Operating Lease Assets"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Non-Current Assets"
+    },
+    "Investments in Associates": {
+      "synonyms": ["Investment in Associates", "Equity Method Investments", "Investments in Joint Ventures", "Associated Companies"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Non-Current Assets"
+    },
+    "Long-term Investments": {
+      "synonyms": ["Non-current Investments", "Long-term Financial Assets", "Available-for-Sale Investments", "Investment Securities"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Non-Current Assets"
+    },
+    "Deferred Tax Assets": {
+      "synonyms": ["Deferred Income Tax Assets", "Deferred Taxation Asset"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Non-Current Assets"
+    },
+    "Other Non-Current Assets": {
+      "synonyms": ["Other Long-term Assets", "Sundry Non-Current Assets"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Non-Current Assets"
+    },
+    "Total Non-Current Assets": {
+      "synonyms": ["Non-Current Assets Total", "Total Fixed Assets", "Total Long-term Assets"],
+      "sign": "positive",
+      "is_total": true,
+      "category": "Non-Current Assets",
+      "formula": "SUM(Non-Current Assets)"
+    },
+    "Total Assets": {
+      "synonyms": ["Assets Total", "Total Assets"],
+      "sign": "positive",
+      "is_total": true,
+      "formula": "Total Current Assets + Total Non-Current Assets"
+    },
+    "Trade Payables": {
+      "synonyms": ["Accounts Payable", "Trade and Other Payables", "Creditors", "Trade Creditors", "Amounts Payable", "Suppliers"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Current Liabilities"
+    },
+    "Short-term Borrowings": {
+      "synonyms": ["Bank Overdraft", "Current Portion of Borrowings", "Short-term Loans", "Short-term Debt", "Bank Loans Current"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Current Liabilities"
+    },
+    "Current Portion of Long-term Debt": {
+      "synonyms": ["Current Maturities of Long-term Debt", "CPLTD", "Current Portion of Borrowings"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Current Liabilities"
+    },
+    "Accrued Expenses": {
+      "synonyms": ["Accruals", "Accrued Liabilities", "Accrued Charges", "Accrued Expenses and Other Liabilities"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Current Liabilities"
+    },
+    "Tax Payable": {
+      "synonyms": ["Income Tax Payable", "Current Tax Liabilities", "Corporation Tax Payable", "Taxes Payable"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Current Liabilities"
+    },
+    "Provisions (Current)": {
+      "synonyms": ["Current Provisions", "Short-term Provisions"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Current Liabilities"
+    },
+    "Contract Liabilities": {
+      "synonyms": ["Deferred Revenue", "Unearned Revenue", "Advance from Customers", "Deferred Income"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Current Liabilities"
+    },
+    "Other Current Liabilities": {
+      "synonyms": ["Sundry Current Liabilities", "Other Payables"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Current Liabilities"
+    },
+    "Total Current Liabilities": {
+      "synonyms": ["Current Liabilities Total"],
+      "sign": "positive",
+      "is_total": true,
+      "category": "Current Liabilities",
+      "formula": "SUM(Current Liabilities)"
+    },
+    "Long-term Borrowings": {
+      "synonyms": ["Non-current Borrowings", "Long-term Loans", "Long-term Debt", "Bank Loans Non-current", "Term Loans", "Senior Notes", "Bonds Payable"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Non-Current Liabilities"
+    },
+    "Lease Liabilities": {
+      "synonyms": ["Operating Lease Liabilities", "Finance Lease Obligations", "Lease Obligations", "Right-of-Use Liabilities"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Non-Current Liabilities"
+    },
+    "Deferred Tax Liabilities": {
+      "synonyms": ["Deferred Income Tax Liabilities", "Deferred Taxation Liability"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Non-Current Liabilities"
+    },
+    "Pension Obligations": {
+      "synonyms": ["Retirement Benefit Obligations", "Employee Benefit Liabilities", "Post-employment Benefits", "Defined Benefit Obligations"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Non-Current Liabilities"
+    },
+    "Provisions (Non-Current)": {
+      "synonyms": ["Long-term Provisions", "Non-current Provisions"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Non-Current Liabilities"
+    },
+    "Other Non-Current Liabilities": {
+      "synonyms": ["Other Long-term Liabilities"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Non-Current Liabilities"
+    },
+    "Total Non-Current Liabilities": {
+      "synonyms": ["Non-Current Liabilities Total"],
+      "sign": "positive",
+      "is_total": true,
+      "category": "Non-Current Liabilities",
+      "formula": "SUM(Non-Current Liabilities)"
+    },
+    "Total Liabilities": {
+      "synonyms": ["Liabilities Total"],
+      "sign": "positive",
+      "is_total": true,
+      "formula": "Total Current Liabilities + Total Non-Current Liabilities"
+    },
+    "Share Capital": {
+      "synonyms": ["Issued Capital", "Common Stock", "Ordinary Shares", "Paid-up Capital", "Authorized and Issued Capital", "Share Capital Issued"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Equity"
+    },
+    "Share Premium": {
+      "synonyms": ["Additional Paid-in Capital", "Capital Surplus", "Premium on Shares"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Equity"
+    },
+    "Retained Earnings": {
+      "synonyms": ["Accumulated Profits", "Retained Profits", "Revenue Reserves", "Undistributed Profits", "Retained Surplus"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Equity"
+    },
+    "Other Reserves": {
+      "synonyms": ["Capital Reserves", "Revaluation Reserve", "Translation Reserve", "Foreign Currency Translation Reserve", "Hedging Reserve", "Fair Value Reserve"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Equity"
+    },
+    "Treasury Shares": {
+      "synonyms": ["Treasury Stock", "Own Shares Held", "Shares Held in Treasury"],
+      "sign": "negative",
+      "is_total": false,
+      "category": "Equity"
+    },
+    "Equity Attributable to Owners": {
+      "synonyms": ["Equity Attributable to Shareholders", "Shareholders Equity", "Stockholders Equity", "Owners Equity"],
+      "sign": "positive",
+      "is_total": true,
+      "category": "Equity"
+    },
+    "Non-Controlling Interests": {
+      "synonyms": ["Minority Interests", "NCI", "Minority Shareholders"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Equity"
+    },
+    "Total Equity": {
+      "synonyms": ["Equity Total", "Total Shareholders Equity", "Net Worth", "Total Stockholders Equity"],
+      "sign": "positive",
+      "is_total": true,
+      "category": "Equity",
+      "formula": "Equity Attributable to Owners + Non-Controlling Interests"
+    },
+    "Total Liabilities and Equity": {
+      "synonyms": ["Total L&E", "Total Liabilities and Shareholders Equity"],
+      "sign": "positive",
+      "is_total": true,
+      "formula": "Total Liabilities + Total Equity"
+    }
+  },
+
+  "CASH_FLOW": {
+    "Profit Before Tax (CF)": {
+      "synonyms": ["Profit/(Loss) Before Tax", "Net Income"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Operating Activities"
+    },
+    "Depreciation (CF)": {
+      "synonyms": ["Depreciation and Amortisation", "D&A Adjustment", "Depreciation Charge"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Operating Activities - Adjustments"
+    },
+    "Amortisation (CF)": {
+      "synonyms": ["Amortisation of Intangibles", "Amortisation Expense"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Operating Activities - Adjustments"
+    },
+    "Impairment (CF)": {
+      "synonyms": ["Impairment Charges", "Write-downs", "Impairment Losses"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Operating Activities - Adjustments"
+    },
+    "Finance Costs (CF)": {
+      "synonyms": ["Interest Expense Adjustment", "Net Finance Costs Added Back"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Operating Activities - Adjustments"
+    },
+    "Share-based Payment Expense": {
+      "synonyms": ["Stock Compensation", "Share Option Expense", "Employee Share Schemes"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Operating Activities - Adjustments"
+    },
+    "Gain/Loss on Disposal of Assets": {
+      "synonyms": ["Gain on Disposal", "Loss on Disposal", "Profit on Sale of Assets", "Loss on Sale of PPE"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Operating Activities - Adjustments"
+    },
+    "Change in Inventories": {
+      "synonyms": ["Decrease/(Increase) in Inventories", "Change in Stock", "Inventory Movement"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Working Capital Changes"
+    },
+    "Change in Trade Receivables": {
+      "synonyms": ["Decrease/(Increase) in Receivables", "Change in Debtors", "Receivables Movement"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Working Capital Changes"
+    },
+    "Change in Trade Payables": {
+      "synonyms": ["Increase/(Decrease) in Payables", "Change in Creditors", "Payables Movement"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Working Capital Changes"
+    },
+    "Change in Other Working Capital": {
+      "synonyms": ["Other Working Capital Changes", "Changes in Other Assets and Liabilities"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Working Capital Changes"
+    },
+    "Income Tax Paid": {
+      "synonyms": ["Tax Paid", "Corporation Tax Paid", "Taxes Paid"],
+      "sign": "negative",
+      "is_total": false,
+      "category": "Operating Activities"
+    },
+    "Interest Paid (CF)": {
+      "synonyms": ["Finance Costs Paid", "Interest Paid"],
+      "sign": "negative",
+      "is_total": false,
+      "category": "Operating Activities"
+    },
+    "Cash from Operating Activities": {
+      "synonyms": ["Net Cash from Operating Activities", "Operating Cash Flow", "Cash Generated from Operations", "Cash Flows from Operating Activities", "Net Cash Provided by Operating Activities"],
+      "sign": "positive",
+      "is_total": true,
+      "category": "Operating Activities"
+    },
+    "Purchase of PPE": {
+      "synonyms": ["Capital Expenditure", "Capex", "Acquisition of Property Plant and Equipment", "Purchase of Fixed Assets", "Additions to PPE"],
+      "sign": "negative",
+      "is_total": false,
+      "category": "Investing Activities"
+    },
+    "Purchase of Intangibles": {
+      "synonyms": ["Acquisition of Intangible Assets", "Software Development Costs", "Capitalised Development Costs"],
+      "sign": "negative",
+      "is_total": false,
+      "category": "Investing Activities"
+    },
+    "Proceeds from Sale of Assets": {
+      "synonyms": ["Sale of PPE", "Disposal of Fixed Assets", "Proceeds from Disposal"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Investing Activities"
+    },
+    "Acquisition of Subsidiaries": {
+      "synonyms": ["Business Combinations", "Purchase of Subsidiaries", "Acquisition of Businesses"],
+      "sign": "negative",
+      "is_total": false,
+      "category": "Investing Activities"
+    },
+    "Purchase of Investments": {
+      "synonyms": ["Investment in Securities", "Purchase of Financial Assets"],
+      "sign": "negative",
+      "is_total": false,
+      "category": "Investing Activities"
+    },
+    "Interest Received": {
+      "synonyms": ["Interest Income Received", "Finance Income Received"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Investing Activities"
+    },
+    "Cash from Investing Activities": {
+      "synonyms": ["Net Cash from Investing Activities", "Cash Flows from Investing Activities", "Net Cash Used in Investing Activities"],
+      "sign": "positive",
+      "is_total": true,
+      "category": "Investing Activities"
+    },
+    "Proceeds from Borrowings": {
+      "synonyms": ["Drawdown of Loans", "New Borrowings", "Proceeds from Loans", "Loan Drawdowns"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Financing Activities"
+    },
+    "Repayment of Borrowings": {
+      "synonyms": ["Loan Repayments", "Repayment of Loans", "Settlement of Borrowings", "Debt Repayment"],
+      "sign": "negative",
+      "is_total": false,
+      "category": "Financing Activities"
+    },
+    "Lease Payments": {
+      "synonyms": ["Payment of Lease Liabilities", "Finance Lease Payments", "Lease Liability Payments"],
+      "sign": "negative",
+      "is_total": false,
+      "category": "Financing Activities"
+    },
+    "Dividends Paid": {
+      "synonyms": ["Dividend Payments", "Distribution to Shareholders", "Dividends to Equity Holders"],
+      "sign": "negative",
+      "is_total": false,
+      "category": "Financing Activities"
+    },
+    "Proceeds from Share Issue": {
+      "synonyms": ["Issuance of Shares", "Share Capital Raised", "Proceeds from Equity"],
+      "sign": "positive",
+      "is_total": false,
+      "category": "Financing Activities"
+    },
+    "Purchase of Treasury Shares": {
+      "synonyms": ["Share Buyback", "Repurchase of Own Shares", "Treasury Stock Purchase"],
+      "sign": "negative",
+      "is_total": false,
+      "category": "Financing Activities"
+    },
+    "Cash from Financing Activities": {
+      "synonyms": ["Net Cash from Financing Activities", "Cash Flows from Financing Activities"],
+      "sign": "positive",
+      "is_total": true,
+      "category": "Financing Activities"
+    },
+    "Net Change in Cash": {
+      "synonyms": ["Net Increase/(Decrease) in Cash", "Change in Cash and Cash Equivalents", "Net Cash Flow"],
+      "sign": "positive",
+      "is_total": true,
+      "formula": "Cash from Operating + Cash from Investing + Cash from Financing"
+    },
+    "Opening Cash": {
+      "synonyms": ["Cash at Beginning of Year", "Cash at Start of Period", "Beginning Cash Balance"],
+      "sign": "positive",
+      "is_total": false
+    },
+    "Exchange Rate Effects": {
+      "synonyms": ["Effect of Exchange Rate Changes", "Foreign Exchange Effect", "Currency Translation Effect"],
+      "sign": "positive",
+      "is_total": false
+    },
+    "Closing Cash": {
+      "synonyms": ["Cash at End of Year", "Cash at End of Period", "Ending Cash Balance"],
+      "sign": "positive",
+      "is_total": true,
+      "formula": "Opening Cash + Net Change in Cash + Exchange Rate Effects"
+    }
+  },
+
+  "RATIOS": {
+    "Current Ratio": {
+      "synonyms": ["Liquidity Ratio", "Working Capital Ratio"],
+      "formula": "Total Current Assets / Total Current Liabilities"
+    },
+    "Quick Ratio": {
+      "synonyms": ["Acid Test Ratio"],
+      "formula": "(Total Current Assets - Inventories) / Total Current Liabilities"
+    },
+    "Debt to Equity": {
+      "synonyms": ["D/E Ratio", "Leverage Ratio", "Gearing Ratio", "Debt/Equity"],
+      "formula": "Total Liabilities / Total Equity"
+    },
+    "Debt to EBITDA": {
+      "synonyms": ["Net Debt/EBITDA", "Leverage Multiple"],
+      "formula": "(Long-term Borrowings + Short-term Borrowings) / EBITDA"
+    },
+    "Interest Coverage": {
+      "synonyms": ["DSCR", "Debt Service Coverage Ratio", "Times Interest Earned", "ICR"],
+      "formula": "Operating Profit / Finance Costs"
+    },
+    "Return on Equity": {
+      "synonyms": ["ROE"],
+      "formula": "Profit for the Year / Total Equity"
+    },
+    "Return on Assets": {
+      "synonyms": ["ROA"],
+      "formula": "Profit for the Year / Total Assets"
+    },
+    "Net Profit Margin": {
+      "synonyms": ["Net Margin", "Profit Margin"],
+      "formula": "Profit for the Year / Revenue"
+    },
+    "Gross Profit Margin": {
+      "synonyms": ["Gross Margin %"],
+      "formula": "Gross Profit / Revenue"
+    },
+    "Operating Profit Margin": {
+      "synonyms": ["Operating Margin", "EBIT Margin"],
+      "formula": "Operating Profit / Revenue"
+    },
+    "Asset Turnover": {
+      "synonyms": ["Total Asset Turnover"],
+      "formula": "Revenue / Total Assets"
+    },
+    "Inventory Days": {
+      "synonyms": ["Days Inventory Outstanding", "DIO", "Stock Days"],
+      "formula": "(Inventories / Cost of Sales) × 365"
+    },
+    "Receivable Days": {
+      "synonyms": ["Days Sales Outstanding", "DSO", "Debtor Days", "Collection Period"],
+      "formula": "(Trade Receivables / Revenue) × 365"
+    },
+    "Payable Days": {
+      "synonyms": ["Days Payable Outstanding", "DPO", "Creditor Days", "Payment Period"],
+      "formula": "(Trade Payables / Cost of Sales) × 365"
+    },
+    "Cash Conversion Cycle": {
+      "synonyms": ["CCC", "Cash Cycle"],
+      "formula": "Inventory Days + Receivable Days - Payable Days"
+    },
+    "Working Capital": {
+      "synonyms": ["Net Working Capital", "NWC"],
+      "formula": "Total Current Assets - Total Current Liabilities"
+    },
+    "EBITDA Margin": {
+      "synonyms": ["EBITDA %"],
+      "formula": "EBITDA / Revenue"
+    },
+    "Equity Ratio": {
+      "synonyms": ["Equity to Assets"],
+      "formula": "Total Equity / Total Assets"
+    },
+    "Net Debt": {
+      "synonyms": ["Net Borrowings"],
+      "formula": "(Long-term Borrowings + Short-term Borrowings) - Cash and Cash Equivalents"
+    },
+    "Free Cash Flow": {
+      "synonyms": ["FCF"],
+      "formula": "Cash from Operating Activities - Purchase of PPE"
+    }
+  }
+}
