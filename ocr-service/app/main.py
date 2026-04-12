@@ -60,6 +60,26 @@ async def lifespan(app: FastAPI):
     from app.services.period_parser import PeriodParser
     app.state.period_parser = PeriodParser()
 
+    # --- STGH Fingerprinter ---
+    if settings.enable_stgh:
+        from app.ml.stgh import STGHConfig, STGHFingerprinter
+
+        app.state.stgh_fingerprinter = STGHFingerprinter(
+            STGHConfig(
+                hash_bits=settings.stgh_hash_bits,
+                k_neighbors=settings.stgh_k_neighbors,
+                gcn_hidden=settings.stgh_gcn_hidden,
+                gcn_output=settings.stgh_gcn_output,
+                semantic_dim=settings.stgh_semantic_dim,
+                similarity_threshold=settings.stgh_similarity_threshold,
+                use_semantic_model=settings.stgh_use_semantic_model,
+            )
+        )
+        app.state.stgh_loaded = True
+    else:
+        app.state.stgh_fingerprinter = None
+        app.state.stgh_loaded = False
+
     # --- Storage client ---
     from app.services.storage_client import StorageClient
     app.state.storage = StorageClient(settings)
@@ -105,13 +125,18 @@ app = FastAPI(
 )
 
 # --- CORS ---
+_allow_credentials = "*" not in settings.cors_origin_list
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
-    allow_credentials=True,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- API Key Authentication (V-05) ---
+from app.middleware.api_key_auth import ApiKeyMiddleware  # noqa: E402
+app.add_middleware(ApiKeyMiddleware, api_key=settings.api_key)
 
 
 # --- Global error handler ---

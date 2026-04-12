@@ -41,6 +41,11 @@ spring:
           auth: true
           starttls:
             enabled: true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -53,7 +58,7 @@ management:
 
 numera:
   jwt:
-    secret: ${JWT_SECRET:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+    secret: ${JWT_SECRET}
     access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:3600000}
     refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
   storage:
@@ -69,3 +74,7 @@ numera:
     retry-backoff-ms: ${ML_RETRY_BACKOFF_MS:500}
     circuit-breaker-failure-threshold: ${ML_CB_FAILURE_THRESHOLD:3}
     circuit-breaker-open-ms: ${ML_CB_OPEN_MS:15000}
+  events:
+    broker-enabled: ${NUMERA_EVENTS_BROKER_ENABLED:false}
+    in-process-fallback-enabled: ${NUMERA_EVENTS_IN_PROCESS_FALLBACK_ENABLED:true}
+    topic-prefix: ${NUMERA_EVENTS_TOPIC_PREFIX:numera}

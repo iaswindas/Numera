@@ -47,7 +47,7 @@ class EmbeddingsCache:
             return None
 
         try:
-            data = np.load(path, allow_pickle=True)
+            data = np.load(path, allow_pickle=False)
             embeddings = data["embeddings"]
             index_map = data["index_map"].tolist()
             logger.debug("Cache hit: %s (%d embeddings)", key, len(embeddings))

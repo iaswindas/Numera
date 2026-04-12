@@ -51,7 +51,10 @@ class StorageClient:
         """
         # --- Local fallback ---
         if self._local_path:
-            local_file = Path(self._local_path) / path
+            root = Path(self._local_path).resolve()
+            local_file = (root / path).resolve()
+            if not str(local_file).startswith(str(root)):
+                raise FileNotFoundError("Invalid storage path")
             if not local_file.exists():
                 raise FileNotFoundError(f"Local file not found: {local_file}")
             return local_file.read_bytes()
@@ -64,7 +67,11 @@ class StorageClient:
             response = self._s3_client.get_object(
                 Bucket=self._bucket, Key=path
             )
-            return response["Body"].read()
+            body = response["Body"]
+            try:
+                return body.read()
+            finally:
+                body.close()
         except self._s3_client.exceptions.NoSuchKey:
             raise FileNotFoundError(f"Object not found in MinIO: {path}")
         except Exception as exc:

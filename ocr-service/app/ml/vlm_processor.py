@@ -63,7 +63,7 @@ class Qwen3VLProcessor:
             from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
 
             load_kwargs = {
-                "trust_remote_code": True,
+                "trust_remote_code": False,
                 "device_map": self.device,
             }
 
@@ -94,7 +94,7 @@ class Qwen3VLProcessor:
                 self.model_id, **load_kwargs
             )
             self.processor = AutoProcessor.from_pretrained(
-                self.model_id, trust_remote_code=True
+                self.model_id, trust_remote_code=False
             )
 
             self.is_loaded = True

@@ -105,13 +105,18 @@ app = FastAPI(
 )
 
 # --- CORS ---
+_allow_credentials = "*" not in settings.cors_origin_list
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
-    allow_credentials=True,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- API Key Authentication (V-05) ---
+from app.middleware.api_key_auth import ApiKeyMiddleware  # noqa: E402
+app.add_middleware(ApiKeyMiddleware, api_key=settings.api_key)
 
 
 # --- Global error handler ---

@@ -238,7 +238,7 @@ def _run_validations(template: dict, expressions: list[MappingExpression]) -> li
                 })
                 continue
 
-            computed = eval(expr)  # Safe: only numbers and operators
+            computed = _safe_eval_math(expr)
             diff = abs(computed - expected)
             passed = diff <= tolerance
 
@@ -258,3 +258,38 @@ def _run_validations(template: dict, expressions: list[MappingExpression]) -> li
             })
 
     return results
+
+
+def _safe_eval_math(expr: str) -> float:
+    """Evaluate arithmetic expressions safely (numbers and operators only)."""
+    import ast
+    import operator as op
+
+    allowed_binary = {
+        ast.Add: op.add,
+        ast.Sub: op.sub,
+        ast.Mult: op.mul,
+        ast.Div: op.truediv,
+        ast.Mod: op.mod,
+        ast.Pow: op.pow,
+    }
+    allowed_unary = {
+        ast.UAdd: op.pos,
+        ast.USub: op.neg,
+    }
+
+    def _eval(node):
+        if isinstance(node, ast.Expression):
+            return _eval(node.body)
+        if isinstance(node, ast.Constant):
+            if isinstance(node.value, (int, float)):
+                return float(node.value)
+            raise ValueError("Unsupported constant type")
+        if isinstance(node, ast.BinOp) and type(node.op) in allowed_binary:
+            return allowed_binary[type(node.op)](_eval(node.left), _eval(node.right))
+        if isinstance(node, ast.UnaryOp) and type(node.op) in allowed_unary:
+            return allowed_unary[type(node.op)](_eval(node.operand))
+        raise ValueError("Unsupported expression")
+
+    parsed = ast.parse(expr, mode="eval")
+    return _eval(parsed)

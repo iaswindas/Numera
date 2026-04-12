@@ -7,9 +7,24 @@ data class NumeraProperties(
     val jwt: Jwt = Jwt(),
     val ml: Ml = Ml(),
     val storage: Storage = Storage(),
+    val events: Events = Events(),
+    val features: Features = Features(),
 ) {
+    data class Features(
+        val workflowEngine: Boolean = false,
+        val eventBroker: Boolean = false,
+        val zkRfaAudit: Boolean = false,
+        val rsBsnPredictor: Boolean = false,
+        val ngMilpSolver: Boolean = true,
+        val hsparKnowledgeGraph: Boolean = false,
+        val owpggrAnomaly: Boolean = false,
+        val fsoFederatedLearning: Boolean = false,
+        val stghFingerprinting: Boolean = true,
+        val externalIntegrations: Boolean = false,
+    )
+
     data class Jwt(
-        val secret: String = "change-me-please-change-me-please-change-me",
+        val secret: String = "",
         val accessExpirationMs: Long = 3600000,
         val refreshExpirationMs: Long = 604800000,
     )
@@ -29,5 +44,11 @@ data class NumeraProperties(
         val accessKey: String = "minioadmin",
         val secretKey: String = "minioadmin",
         val bucket: String = "numera-docs",
+    )
+
+    data class Events(
+        val brokerEnabled: Boolean = false,
+        val inProcessFallbackEnabled: Boolean = true,
+        val topicPrefix: String = "numera",
     )
 }

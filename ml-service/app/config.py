@@ -1,5 +1,6 @@
 """ML Service configuration via pydantic-settings."""
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,10 +11,13 @@ class MlSettings(BaseSettings):
     port: int = 8002
     debug: bool = False
 
+    # Internal API key (must match backend's configured key)
+    api_key: str = ""
+
     # Storage
     minio_endpoint: str = "localhost:9000"
-    minio_access_key: str = "minioadmin"
-    minio_secret_key: str = "minioadmin"
+    minio_access_key: str = ""
+    minio_secret_key: str = ""
 
     # MLflow
     mlflow_uri: str = "http://localhost:5000"
@@ -42,7 +46,7 @@ class MlSettings(BaseSettings):
     pg_port: int = 5432
     pg_database: str = "numera_ml"
     pg_user: str = "numera"
-    pg_password: str = "numera"
+    pg_password: str = ""
     pg_min_pool: int = 2
     pg_max_pool: int = 10
 
@@ -57,8 +61,33 @@ class MlSettings(BaseSettings):
 
     # --- Phase 1: Pipeline ---
     ocr_service_url: str = "http://ocr-service:8001"
+    backend_url: str = "http://backend:8080"
     pipeline_timeout_seconds: int = 120
     pipeline_pages_per_batch: int = 5
+
+    # --- Phase 1: NG-MILP ---
+    enable_ng_milp: bool = False
+    ng_milp_tolerance: float = 0.005
+    ng_milp_timeout_ms: int = 5000
+    ng_milp_use_ortools: bool = True
+    ng_milp_gnn_weights: str = ""
+    ng_milp_max_candidates_per_cell: int = 15
+    ng_milp_candidate_row_window: int = 16
+    ng_milp_max_addends: int = 6
+
+    # --- Phase 1: STGH matching ---
+    fingerprint_similarity_threshold: float = 0.85
+
+    @model_validator(mode="after")
+    def validate_security(self):
+        if not self.debug:
+            if not self.api_key.strip():
+                raise ValueError("ML_API_KEY must be configured")
+            if not self.minio_access_key.strip() or not self.minio_secret_key.strip():
+                raise ValueError("ML_MINIO_ACCESS_KEY and ML_MINIO_SECRET_KEY must be configured")
+            if not self.pg_password.strip():
+                raise ValueError("ML_PG_PASSWORD must be configured")
+        return self
 
     @property
     def cors_origin_list(self) -> list[str]:
