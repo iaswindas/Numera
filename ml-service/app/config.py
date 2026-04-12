@@ -78,6 +78,17 @@ class MlSettings(BaseSettings):
     # --- Phase 1: STGH matching ---
     fingerprint_similarity_threshold: float = 0.85
 
+    # --- Phase 1: FSO Federated Learning ---
+    fso_enabled: bool = False
+    fso_shared_subspace_dim: int = 64
+    fso_private_subspace_dim: int = 32
+    fso_min_tenants: int = 2
+    fso_max_rounds: int = 100
+    fso_learning_rate: float = 1e-3
+    fso_clip_norm: float = 1.0
+    fso_privacy_epsilon: float = 1.0
+    fso_orthogonality_tolerance: float = 1e-6
+
     @model_validator(mode="after")
     def validate_security(self):
         if not self.debug:

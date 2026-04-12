@@ -1,0 +1,37 @@
+# NG-MILP GNN Pruner Training Configuration
+# Binary cross-entropy on edge labels
+
+model:
+  feature_dim: 7   # |sum_val|, |addend_val|, spatial_dist, hierarchy_gap, value_ratio, is_total, indent_flag
+  hidden_dims: [32, 16]
+  dropout: 0.2
+
+training:
+  learning_rate: 1.0e-3
+  weight_decay: 1.0e-4
+  batch_size: 64
+  num_epochs: 40
+  pos_weight: 3.0          # Class weight for positive edges (imbalanced)
+  early_stopping_patience: 5
+  warmup_epochs: 2
+  gradient_clip_norm: 1.0
+  label_smoothing: 0.05
+
+data:
+  sample_documents_dir: "data/sample_documents"
+  train_split: 0.8
+  val_split: 0.1
+  test_split: 0.1
+  tolerance: 0.005         # Arithmetic tolerance for labeling ground truth
+  max_candidates_per_cell: 15
+  candidate_row_window: 16
+  max_addends: 6
+
+output:
+  weights_path: "ml-service/models/ng_milp_gnn_weights.pt"
+  checkpoint_dir: "ml-training/checkpoints/ng_milp_gnn"
+  log_dir: "ml-training/logs/ng_milp_gnn"
+
+mlflow:
+  experiment: "ng-milp-gnn-pruner"
+  model_name: "ng-milp-gnn-pruner"

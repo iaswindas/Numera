@@ -1,0 +1,160 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Covenant Breach Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(numera_covenant_breaches_total[1h])",
+          "legendFormat": "Breach Rate (/hr)",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(numera_covenant_checks_total[1h])",
+          "legendFormat": "Check Rate (/hr)",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" }
+      }
+    },
+    {
+      "title": "Active Breaches by Severity",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "numera_covenant_active_breaches by (severity)",
+          "legendFormat": "{{ severity }}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Active Waivers",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        {
+          "expr": "numera_covenant_active_waivers",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Covenant Compliance % by Customer",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "numera_covenant_compliance_rate by (customer)",
+          "legendFormat": "{{ customer }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "max": 1,
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.8 },
+              { "color": "green", "value": 0.95 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Upcoming Deadlines (next 30 days)",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "numera_covenant_days_until_deadline < 30",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Breach Predictions (next 90 days)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "numera_covenant_breach_probability",
+          "legendFormat": "{{ customer }} - {{ covenant_type }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "max": 1,
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "red", "value": 0.8 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Waiver Pending Duration",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "numera_covenant_waiver_pending_hours",
+          "legendFormat": "{{ customer }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "h" }
+      }
+    },
+    {
+      "title": "Document Verification Pipeline",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "numera_covenant_docs_pending_verification",
+          "legendFormat": "Pending Verification",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(numera_covenant_docs_verified_total[1h])",
+          "legendFormat": "Verified /hr",
+          "refId": "B"
+        },
+        {
+          "expr": "rate(numera_covenant_docs_rejected_total[1h])",
+          "legendFormat": "Rejected /hr",
+          "refId": "C"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["numera", "covenants", "compliance"],
+  "templating": { "list": [] },
+  "time": { "from": "now-24h", "to": "now" },
+  "title": "Numera Covenant Health",
+  "uid": "numera-covenant-health"
+}

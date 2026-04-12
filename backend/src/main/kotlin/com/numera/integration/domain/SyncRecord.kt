@@ -18,6 +18,7 @@ enum class SyncStatus {
     PENDING,
     IN_PROGRESS,
     COMPLETED,
+    RETRYING,
     FAILED,
     CONFLICT,
 }
@@ -60,4 +61,7 @@ class SyncRecord : TenantAwareEntity() {
 
     @Column
     var syncedAt: Instant? = null
+
+    @Column
+    var nextRetryAt: Instant? = null
 }

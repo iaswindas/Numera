@@ -45,6 +45,7 @@ class STGHFingerprinter:
         )
         self.hasher = LocalitySensitiveHasher(config.gcn_output, config.hash_bits)
         self.sbert_model = None
+        self._sbert_projection: np.ndarray | None = None
 
     def fingerprint(self, page: OCRPage) -> DocumentFingerprint:
         graph = self._build_spatial_graph(page)
@@ -152,7 +153,49 @@ class STGHFingerprinter:
         return adjacency
 
     def _encode_texts(self, nodes: list[OCRNode]) -> np.ndarray:
+        if self.config.use_semantic_model:
+            return self._encode_texts_sbert(nodes)
         return np.asarray([self._hash_text(self._normalize_text(node)) for node in nodes], dtype=np.float32)
+
+    def _load_sbert_model(self) -> None:
+        """Lazily load the sentence transformer for semantic encoding."""
+        if self.sbert_model is not None:
+            return
+        try:
+            from sentence_transformers import SentenceTransformer
+
+            self.sbert_model = SentenceTransformer(self.config.sbert_model)
+            sbert_dim = self.sbert_model.get_sentence_embedding_dimension()
+            if sbert_dim != self.config.semantic_dim:
+                rng = np.random.default_rng(42)
+                self._sbert_projection = rng.standard_normal(
+                    (sbert_dim, self.config.semantic_dim), dtype=np.float32,
+                ) / np.sqrt(self.config.semantic_dim)
+            logger.info("Loaded SBERT model: %s (dim=%d)", self.config.sbert_model, sbert_dim)
+        except Exception:
+            logger.warning(
+                "Failed to load SBERT model '%s', falling back to hash encoding",
+                self.config.sbert_model,
+            )
+
+    def _encode_texts_sbert(self, nodes: list[OCRNode]) -> np.ndarray:
+        """Encode node texts using sentence-transformer embeddings."""
+        self._load_sbert_model()
+        if self.sbert_model is None:
+            return np.asarray(
+                [self._hash_text(self._normalize_text(node)) for node in nodes],
+                dtype=np.float32,
+            )
+        texts = [self._normalize_text(node) for node in nodes]
+        embeddings = self.sbert_model.encode(
+            texts, convert_to_numpy=True, normalize_embeddings=True,
+        )
+        if self._sbert_projection is not None:
+            embeddings = embeddings @ self._sbert_projection
+            norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+            norms = np.where(norms == 0, 1.0, norms)
+            embeddings = embeddings / norms
+        return embeddings.astype(np.float32)
 
     def _normalize_text(self, node: OCRNode) -> str:
         if node.cell_type == "NUMERIC":

@@ -1,4 +1,4 @@
-package com.numera.shared.infrastructure
+package com.numera.covenant.infrastructure
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.numera.covenant.application.CovenantIntelligenceService
@@ -97,7 +97,8 @@ class EventConsumers(
                 }
                 "SpreadSubmittedEvent" -> {
                     val event = objectMapper.readValue(payload, SpreadSubmittedEvent::class.java)
-                    covenantIntelligenceService.materializeCustomerHeatmap(event.tenantId, event.customerId)
+                    // Full recomputation: refresh breach probabilities + materialize heatmap
+                    covenantIntelligenceService.recomputeForCustomer(event.customerId, event.tenantId)
                 }
                 else -> {
                     log.debug(

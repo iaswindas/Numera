@@ -1,0 +1,41 @@
+# STGH GCN Training Configuration
+# Contrastive learning on document fingerprint embeddings
+
+model:
+  input_dim: 135       # semantic_dim (128) + spatial (4) + type (3)
+  gcn_hidden: 128
+  gcn_output: 256
+  semantic_dim: 128
+  k_neighbors: 6
+
+training:
+  learning_rate: 1.0e-3
+  weight_decay: 1.0e-4
+  batch_size: 32
+  num_epochs: 50
+  margin: 1.0            # Contrastive loss margin
+  temperature: 0.07      # InfoNCE temperature
+  loss: "infonce"         # "contrastive" or "infonce"
+  pairs_per_document: 5   # Positive pairs per anchor document
+  negative_ratio: 3       # Negatives per positive pair
+  early_stopping_patience: 7
+  warmup_epochs: 3
+  gradient_clip_norm: 1.0
+
+data:
+  sample_documents_dir: "data/sample_documents"
+  train_split: 0.8
+  val_split: 0.1
+  test_split: 0.1
+  min_nodes_per_page: 3
+  max_pages_per_document: 20
+  augment_noise_std: 0.01   # Gaussian noise for positive augmentation
+
+output:
+  weights_path: "ml-service/models/stgh_gcn_weights.pt"
+  checkpoint_dir: "ml-training/checkpoints/stgh_gcn"
+  log_dir: "ml-training/logs/stgh_gcn"
+
+mlflow:
+  experiment: "stgh-gcn-contrastive"
+  model_name: "stgh-gcn"

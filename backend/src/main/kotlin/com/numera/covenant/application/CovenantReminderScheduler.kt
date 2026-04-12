@@ -31,6 +31,21 @@ class CovenantReminderScheduler(
     private val sentReminders: MutableMap<String, LocalDate> = ConcurrentHashMap()
 
     /**
+     * Remove stale entries from the sentReminders map to prevent unbounded memory growth.
+     * Only entries for today are relevant; older entries can be safely discarded.
+     */
+    private fun cleanStaleEntries() {
+        val today = LocalDate.now()
+        val staleKeys = sentReminders.entries
+            .filter { it.value.isBefore(today) }
+            .map { it.key }
+        if (staleKeys.isNotEmpty()) {
+            staleKeys.forEach { sentReminders.remove(it) }
+            log.debug("Cleaned {} stale reminder dedup entries", staleKeys.size)
+        }
+    }
+
+    /**
      * Send due reminders (X days before due date).
      * Runs daily at 08:00 UTC.
      */
@@ -38,6 +53,7 @@ class CovenantReminderScheduler(
     @Transactional
     fun sendDueReminders() {
         log.info("Starting sendDueReminders scheduler")
+        cleanStaleEntries()
         try {
             val items = monitoringRepository.findByStatusIn(
                 listOf(CovenantStatus.DUE, CovenantStatus.SUBMITTED)
@@ -93,6 +109,7 @@ class CovenantReminderScheduler(
     @Transactional
     fun sendOverdueReminders() {
         log.info("Starting sendOverdueReminders scheduler")
+        cleanStaleEntries()
         try {
             val items = monitoringRepository.findByStatusIn(
                 listOf(CovenantStatus.OVERDUE, CovenantStatus.SUBMITTED)

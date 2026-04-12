@@ -1,0 +1,17 @@
+apiVersion: v2
+name: numera
+description: Numera Enterprise Financial Document Processing Platform
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+maintainers:
+  - name: Numera Engineering
+keywords:
+  - financial
+  - document-processing
+  - spreading
+  - covenant-monitoring
+  - machine-learning
+home: https://numera.io
+sources:
+  - https://github.com/numera/numera

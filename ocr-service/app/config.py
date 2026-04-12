@@ -58,6 +58,7 @@ class OcrSettings(BaseSettings):
     stgh_semantic_dim: int = 128
     stgh_similarity_threshold: float = 0.85
     stgh_use_semantic_model: bool = False
+    stgh_sbert_model: str = "BAAI/bge-small-en-v1.5"
 
     # CORS
     cors_origins: str = "*"

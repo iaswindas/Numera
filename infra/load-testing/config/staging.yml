@@ -1,0 +1,25 @@
+# Locust staging configuration
+# Usage: locust -f locustfile.py --config config/staging.yml
+
+host: https://staging.numera.io
+users: 50
+spawn-rate: 5
+run-time: 10m
+headless: false
+
+# Tags to include/exclude
+# tags: [upload, burst]
+# exclude-tags: []
+
+# CSV output
+csv: results/staging
+csv-full-history: true
+
+# Logging
+loglevel: INFO
+logfile: results/staging.log
+
+# Thresholds (checked post-run by CI)
+# These are informational; enforce via locust-plugins or CI scripts
+# expect-max-response-time: 5000  # 5s
+# expect-min-rps: 10

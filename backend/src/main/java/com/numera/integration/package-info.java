@@ -8,8 +8,14 @@
                 "shared::config",
                 "shared::infrastructure",
                 "document",
+                "document::domain",
                 "spreading",
-                "customer"
+                "spreading::domain",
+                "spreading::infrastructure",
+                "customer",
+                "customer::domain",
+                "model",
+                "model::domain"
         }
 )
 package com.numera.integration;

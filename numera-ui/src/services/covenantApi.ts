@@ -269,3 +269,113 @@ export function useSignatures() {
     queryFn: () => fetchApi('/covenants/signatures'),
   })
 }
+
+/* ── Contacts (replaces hardcoded contacts in waiver flow) ── */
+
+export interface CovenantContact {
+  id: string
+  name: string
+  email: string
+  role?: string
+}
+
+export function useMonitoringItemContacts(monitoringItemId: string) {
+  return useQuery<CovenantContact[]>({
+    queryKey: ['covenant', 'monitoring', monitoringItemId, 'contacts'],
+    queryFn: () => fetchApi(`/covenants/monitoring/${monitoringItemId}/contacts`),
+    enabled: !!monitoringItemId,
+  })
+}
+
+/* ── Document Verification ── */
+
+export function useMonitoringDocuments(monitoringItemId: string) {
+  return useQuery({
+    queryKey: ['covenant', 'monitoring', monitoringItemId, 'documents'],
+    queryFn: () => fetchApi(`/covenants/monitoring/${monitoringItemId}/documents`),
+    enabled: !!monitoringItemId,
+    refetchInterval: 5000,
+  })
+}
+
+export function useUploadMonitoringDocument() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ monitoringItemId, formData }: { monitoringItemId: string; formData: FormData }) => {
+      const response = await fetch(`/api/covenants/monitoring/${monitoringItemId}/documents`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: formData,
+      })
+      if (!response.ok) throw new Error(`Upload failed: ${response.statusText}`)
+      return response.json()
+    },
+    onSuccess: (_data, variables) => {
+      void qc.invalidateQueries({ queryKey: ['covenant', 'monitoring', variables.monitoringItemId, 'documents'] })
+    },
+  })
+}
+
+export function useSubmitForVerification() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ monitoringItemId, documentId }: { monitoringItemId: string; documentId: string }) =>
+      fetchApi(`/covenants/monitoring/${monitoringItemId}/documents/${documentId}/submit`, { method: 'POST' }),
+    onSuccess: (_data, variables) => {
+      void qc.invalidateQueries({ queryKey: ['covenant', 'monitoring', variables.monitoringItemId, 'documents'] })
+    },
+  })
+}
+
+export function useCheckerDecision() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      monitoringItemId,
+      documentId,
+      payload,
+    }: {
+      monitoringItemId: string
+      documentId: string
+      payload: { decision: 'APPROVE' | 'REJECT'; comments: string; reviewerId: string }
+    }) =>
+      fetchApi(`/covenants/monitoring/${monitoringItemId}/documents/${documentId}/checker-decision`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: (_data, variables) => {
+      void qc.invalidateQueries({ queryKey: ['covenant', 'monitoring', variables.monitoringItemId, 'documents'] })
+    },
+  })
+}
+
+export function useTriggerDocumentAction() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      monitoringItemId,
+      documentId,
+      action,
+    }: {
+      monitoringItemId: string
+      documentId: string
+      action: string
+    }) =>
+      fetchApi(`/covenants/monitoring/${monitoringItemId}/documents/${documentId}/trigger-action`, {
+        method: 'POST',
+        body: JSON.stringify({ action }),
+      }),
+    onSuccess: (_data, variables) => {
+      void qc.invalidateQueries({ queryKey: ['covenant', 'monitoring', variables.monitoringItemId, 'documents'] })
+    },
+  })
+}
+
+export function useDuplicateEmailTemplate() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      fetchApi(`/covenants/templates/${id}/duplicate`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['covenant', 'templates'] }),
+  })
+}

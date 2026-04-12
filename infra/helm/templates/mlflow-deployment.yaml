@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-mlflow
+  labels:
+    {{- include "numera.labels" (dict "name" "mlflow" "Release" .Release "Chart" .Chart "Values" .Values) | nindent 4 }}
+spec:
+  replicas: {{ .Values.mlflow.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "numera.selectorLabels" (dict "name" "mlflow" "Release" .Release) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "numera.selectorLabels" (dict "name" "mlflow" "Release" .Release) | nindent 8 }}
+    spec:
+      containers:
+        - name: mlflow
+          image: "{{ .Values.global.imageRegistry }}{{ .Values.mlflow.image.repository }}:{{ .Values.mlflow.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 5000
+              protocol: TCP
+          env:
+            - name: MLFLOW_BACKEND_STORE_URI
+              value: "postgresql://$(PG_USER):$(PG_PASS)@{{ .Release.Name }}-postgresql:5432/numera"
+            - name: MLFLOW_DEFAULT_ARTIFACT_ROOT
+              value: "s3://mlflow-artifacts"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-secrets
+                  key: minio-access-key
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-secrets
+                  key: minio-secret-key
+            - name: MLFLOW_S3_ENDPOINT_URL
+              value: "http://{{ .Release.Name }}-minio:9000"
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-secrets
+                  key: postgres-user
+            - name: PG_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-secrets
+                  key: postgres-password
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.mlflow.resources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-mlflow
+  labels:
+    {{- include "numera.labels" (dict "name" "mlflow" "Release" .Release "Chart" .Chart "Values" .Values) | nindent 4 }}
+spec:
+  type: {{ .Values.mlflow.service.type }}
+  ports:
+    - port: {{ .Values.mlflow.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "numera.selectorLabels" (dict "name" "mlflow" "Release" .Release) | nindent 4 }}

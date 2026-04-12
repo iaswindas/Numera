@@ -8,6 +8,7 @@ import java.util.UUID
 @Repository
 interface SpreadItemRepository : JpaRepository<SpreadItem, UUID> {
     fun findByCustomerId(customerId: UUID): List<SpreadItem>
+    fun findByTenantId(tenantId: UUID): List<SpreadItem>
     fun findTopByCustomerIdAndTemplateIdAndIdNotOrderByStatementDateDesc(
         customerId: UUID,
         templateId: UUID,

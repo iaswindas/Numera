@@ -17,6 +17,8 @@ interface SpreadTableProps {
   showVariance?: boolean
   varianceData?: SpreadVarianceDto[]
   showOnlyMapped?: boolean
+  showSmartFill?: boolean
+  showCurrency?: boolean
   spreadId: string
 }
 
@@ -47,6 +49,8 @@ export function SpreadTable({
   showVariance = false,
   varianceData = [],
   showOnlyMapped = false,
+  showSmartFill = false,
+  showCurrency = false,
   spreadId,
 }: SpreadTableProps) {
   const gridRef = useRef<AgGridReact>(null)
@@ -114,9 +118,24 @@ export function SpreadTable({
           if (typeof confidenceStyle.background === 'string') {
             style.background = confidenceStyle.background
           }
+          if (showSmartFill && params.data?.isAutofilled) {
+            style.background = 'rgba(168, 85, 247, 0.10)'
+            style.borderLeft = '3px solid #a855f7'
+          }
           return style
         },
       },
+      ...(showCurrency
+        ? [
+            {
+              headerName: 'Currency',
+              field: 'currency' as const,
+              width: 80,
+              valueFormatter: (p: { value: string | null | undefined }) => p.value ?? 'USD',
+              cellStyle: () => ({ fontSize: 11, color: 'var(--text-muted)' }),
+            },
+          ]
+        : []),
       ...(showVariance
         ? [
             {
@@ -205,7 +224,7 @@ export function SpreadTable({
         cellStyle: () => ({ fontFamily: 'inherit', fontSize: 11 }),
       },
     ],
-    [isLocked, showVariance, varianceMap, updateNotesMutation]
+    [isLocked, showVariance, varianceMap, showSmartFill, showCurrency, updateNotesMutation]
   )
 
   const onCellClicked = useCallback(

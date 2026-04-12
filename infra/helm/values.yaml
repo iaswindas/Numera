@@ -1,0 +1,220 @@
+global:
+  namespace: numera
+  imagePullPolicy: IfNotPresent
+  imageRegistry: ""
+  storageClass: ""
+  labels:
+    app.kubernetes.io/part-of: numera
+
+# ─── Backend (Spring Boot) ────────────────────────────────────────
+backend:
+  replicaCount: 2
+  image:
+    repository: numera/backend
+    tag: "0.1.0"
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  env:
+    SPRING_PROFILES_ACTIVE: prod
+    SERVER_PORT: "8080"
+    SPRING_DATASOURCE_URL: jdbc:postgresql://numera-postgresql:5432/numera
+    SPRING_REDIS_HOST: numera-redis
+    SPRING_RABBITMQ_HOST: numera-rabbitmq
+    NUMERA_ML_OCR_SERVICE_URL: http://numera-ocr-service:8001/api
+    NUMERA_ML_ML_SERVICE_URL: http://numera-ml-service:8002/api
+    NUMERA_STORAGE_ENDPOINT: http://numera-minio:9000
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPU: 70
+    targetMemory: 80
+
+# ─── ML Service (FastAPI) ─────────────────────────────────────────
+mlService:
+  replicaCount: 2
+  image:
+    repository: numera/ml-service
+    tag: "0.1.0"
+  service:
+    type: ClusterIP
+    port: 8002
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+    limits:
+      cpu: "4"
+      memory: 4Gi
+  gpu:
+    enabled: false
+    count: 1
+  env:
+    ML_DEVICE: cpu
+    ML_MLFLOW_URI: http://numera-mlflow:5000
+    ML_MINIO_ENDPOINT: numera-minio:9000
+    ML_PG_HOST: numera-postgresql
+    ML_PG_PORT: "5432"
+    ML_PG_DATABASE: numera
+    ML_OCR_SERVICE_URL: http://numera-ocr-service:8001
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPU: 75
+
+# ─── OCR Service (FastAPI) ────────────────────────────────────────
+ocrService:
+  replicaCount: 1
+  image:
+    repository: numera/ocr-service
+    tag: "0.1.0"
+  service:
+    type: ClusterIP
+    port: 8001
+  resources:
+    requests:
+      cpu: "1"
+      memory: 4Gi
+    limits:
+      cpu: "4"
+      memory: 12Gi
+  env:
+    OCR_PROCESSOR_BACKEND: qwen3vl
+    OCR_VLM_QUANTIZE: "true"
+    OCR_VLM_DEVICE: auto
+    OCR_MINIO_ENDPOINT: numera-minio:9000
+
+# ─── Frontend (Next.js) ──────────────────────────────────────────
+frontend:
+  replicaCount: 2
+  image:
+    repository: numera/frontend
+    tag: "0.1.0"
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    NEXT_PUBLIC_API_URL: /api
+
+# ─── PostgreSQL ───────────────────────────────────────────────────
+postgresql:
+  image:
+    repository: postgres
+    tag: "16-alpine"
+  storage:
+    size: 50Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+  env:
+    POSTGRES_DB: numera
+    POSTGRES_USER: numera
+
+# ─── Redis ────────────────────────────────────────────────────────
+redis:
+  image:
+    repository: redis
+    tag: "7-alpine"
+  storage:
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+# ─── MinIO ────────────────────────────────────────────────────────
+minio:
+  image:
+    repository: minio/minio
+    tag: latest
+  storage:
+    size: 100Gi
+  service:
+    apiPort: 9000
+    consolePort: 9001
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+# ─── RabbitMQ ─────────────────────────────────────────────────────
+rabbitmq:
+  image:
+    repository: rabbitmq
+    tag: "3-management-alpine"
+  storage:
+    size: 10Gi
+  service:
+    amqpPort: 5672
+    managementPort: 15672
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+# ─── MLflow ───────────────────────────────────────────────────────
+mlflow:
+  replicaCount: 1
+  image:
+    repository: numera/mlflow
+    tag: "0.1.0"
+  service:
+    type: ClusterIP
+    port: 5000
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+# ─── Ingress ──────────────────────────────────────────────────────
+ingress:
+  enabled: true
+  className: nginx
+  host: numera.example.com
+  tls:
+    enabled: true
+    secretName: numera-tls
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+
+# ─── Secrets ──────────────────────────────────────────────────────
+secrets:
+  postgresPassword: CHANGEME
+  jwtSecret: CHANGEME
+  minioAccessKey: minioadmin
+  minioSecretKey: CHANGEME
+  rabbitmqPassword: CHANGEME
+  redisPassword: ""
