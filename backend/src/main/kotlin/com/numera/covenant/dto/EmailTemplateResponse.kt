@@ -16,12 +16,14 @@ data class EmailTemplateResponse(
 
 data class SignatureRequest(
     val name: String,
+    val title: String? = null,
     val htmlContent: String,
 )
 
 data class SignatureResponse(
     val id: UUID,
     val name: String,
+    val title: String?,
     val htmlContent: String,
     val isActive: Boolean,
     val createdAt: Instant,

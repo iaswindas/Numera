@@ -1,10 +1,13 @@
 package com.numera.customer.infrastructure
 
 import com.numera.customer.domain.Customer
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
+import java.util.Optional
 import java.util.UUID
 
 @Repository
@@ -44,4 +47,35 @@ interface CustomerRepository : JpaRepository<Customer, UUID> {
         @Param("industry") industry: String?,
         @Param("country") country: String?,
     ): List<Customer>
+
+    @Query(
+        """
+        select c from Customer c
+        inner join com.numera.admin.domain.GroupCustomerAccess gca on c.id = gca.customerId
+        inner join com.numera.admin.domain.UserGroup ug on gca.group.id = ug.id
+        where c.tenantId = :tenantId
+          and ug.id in :groupIds
+        """
+    )
+    fun findAllByTenantIdAndGroupIdIn(
+        @Param("tenantId") tenantId: UUID,
+        @Param("groupIds") groupIds: List<UUID>,
+        pageable: Pageable,
+    ): Page<Customer>
+
+    @Query(
+        """
+        select c from Customer c
+        inner join com.numera.admin.domain.GroupCustomerAccess gca on c.id = gca.customerId
+        inner join com.numera.admin.domain.UserGroup ug on gca.group.id = ug.id
+        where c.id = :id
+          and c.tenantId = :tenantId
+          and ug.id in :groupIds
+        """
+    )
+    fun findByIdAndTenantIdAndGroupIdIn(
+        @Param("id") id: UUID,
+        @Param("tenantId") tenantId: UUID,
+        @Param("groupIds") groupIds: List<UUID>,
+    ): Optional<Customer>
 }

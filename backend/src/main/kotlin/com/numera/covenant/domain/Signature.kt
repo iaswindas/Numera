@@ -13,6 +13,9 @@ class Signature : TenantAwareEntity() {
     @Column(nullable = false)
     var name: String = ""
 
+    @Column
+    var title: String? = null
+
     @Column(columnDefinition = "TEXT", nullable = false)
     var htmlContent: String = ""
 

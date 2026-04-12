@@ -1,13 +1,14 @@
 package com.numera.document.application
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.numera.auth.infrastructure.UserRepository
-import com.numera.customer.infrastructure.CustomerRepository
+import com.numera.auth.UserLookupFacade
+import com.numera.customer.CustomerQueryPort
 import com.numera.document.domain.DetectedZone
 import com.numera.document.domain.Document
 import com.numera.document.domain.DocumentStatus
 import com.numera.document.dto.DocumentResponse
 import com.numera.document.dto.DocumentStatusResponse
+import com.numera.document.dto.ZoneBoundingBox
 import com.numera.document.dto.DocumentUploadResponse
 import com.numera.document.dto.ZoneResponse
 import com.numera.document.dto.ZoneUpdateRequest
@@ -22,8 +23,10 @@ import com.numera.shared.audit.AuditService
 import com.numera.shared.domain.TenantAwareEntity
 import com.numera.shared.exception.ApiException
 import com.numera.shared.exception.ErrorCode
+import com.numera.shared.infrastructure.DomainEventPublisher
 import com.numera.shared.security.CurrentUserProvider
-import org.springframework.context.ApplicationEventPublisher
+import com.numera.shared.security.TenantContext
+import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
@@ -34,44 +37,66 @@ import java.util.concurrent.Executor
 
 @Service
 class DocumentProcessingService(
-    private val customerRepository: CustomerRepository,
-    private val userRepository: UserRepository,
+    private val customerQueryPort: CustomerQueryPort,
+    private val userLookupFacade: UserLookupFacade,
     private val documentRepository: DocumentRepository,
     private val zoneRepository: DetectedZoneRepository,
     private val minioStorageClient: MinioStorageClient,
     private val mlServiceClient: MlServiceClient,
     private val auditService: AuditService,
     private val objectMapper: ObjectMapper,
-    private val publisher: ApplicationEventPublisher,
+    private val publisher: DomainEventPublisher,
     private val currentUserProvider: CurrentUserProvider,
     private val taskExecutor: Executor,
     private val transactionTemplate: TransactionTemplate,
 ) {
-    fun list(customerId: UUID?): List<DocumentResponse> {
-        val docs = if (customerId == null) {
-            documentRepository.findAll()
-        } else {
-            documentRepository.findByCustomerId(customerId)
+    fun list(customerId: UUID?, uploadedBy: String?, status: DocumentStatus?): List<DocumentResponse> {
+        val tenantId = TenantContext.get()?.let { UUID.fromString(it) } ?: TenantAwareEntity.DEFAULT_TENANT
+        val effectiveUploadedBy = resolveUploadedByFilter(uploadedBy)
+
+        var spec = Specification.where<Document> { root, _, cb ->
+            cb.equal(root.get<UUID>("tenantId"), tenantId)
         }
+
+        if (customerId != null) {
+            spec = spec.and { root, _, cb ->
+                cb.equal(root.get<Any>("customer").get<UUID>("id"), customerId)
+            }
+        }
+
+        if (effectiveUploadedBy != null) {
+            spec = spec.and { root, _, cb ->
+                cb.equal(root.get<String>("uploadedBy"), effectiveUploadedBy)
+            }
+        }
+
+        if (status != null) {
+            spec = spec.and { root, _, cb ->
+                cb.equal(root.get<DocumentStatus>("status"), status)
+            }
+        }
+
+        val docs = documentRepository.findAll(spec)
         return docs.sortedByDescending { it.createdAt }.map { it.toResponse() }
     }
 
     @Transactional
-    fun upload(customerId: UUID, file: MultipartFile, language: String): DocumentUploadResponse {
-        val customer = customerRepository.findById(customerId)
-            .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Customer not found") }
+    fun upload(customerId: UUID, file: MultipartFile, language: String, password: String? = null): DocumentUploadResponse {
+        val customer = customerQueryPort.findEntityById(customerId)
         val storagePath = minioStorageClient.upload(file)
         val currentUser = currentUserProvider.email()
-            ?.let { userRepository.findByEmailIgnoreCase(it).orElse(null) }
-            ?: userRepository.findByEmailIgnoreCase("admin@numera.ai").orElse(null)
+            ?.let { userLookupFacade.findUploadedByInfo(it) }
+            ?: userLookupFacade.findUploadedByInfo("admin@numera.ai")
         val uploadedBy = currentUser?.id?.toString() ?: "system"
         val uploadedByName = currentUser?.fullName ?: "System"
+
+        val safeFilename = sanitizeFilename(file.originalFilename ?: "document.pdf")
 
         val saved = documentRepository.save(Document().also {
             it.tenantId = customer.tenantId
             it.customer = customer
-            it.fileName = file.originalFilename ?: "document.pdf"
-            it.originalFilename = file.originalFilename ?: "document.pdf"
+            it.fileName = safeFilename
+            it.originalFilename = safeFilename
             it.storagePath = storagePath
             it.fileSize = file.size
             it.contentType = file.contentType ?: "application/pdf"
@@ -91,7 +116,7 @@ class DocumentProcessingService(
             parentEntityId = customer.id.toString(),
         )
 
-        queueProcessing(saved.id!!)
+        queueProcessing(saved.id!!, password)
 
         return DocumentUploadResponse(
             documentId = saved.id.toString(),
@@ -101,32 +126,37 @@ class DocumentProcessingService(
         )
     }
 
-    fun process(documentId: UUID): DocumentStatusResponse = transactionTemplate.execute {
-        processInternal(documentId)
+    fun process(documentId: UUID, password: String? = null): DocumentStatusResponse = transactionTemplate.execute {
+        processInternal(documentId, password)
     } ?: throw ApiException(ErrorCode.INTERNAL_ERROR, "Unable to process document")
 
-    private fun queueProcessing(documentId: UUID) {
+    private fun queueProcessing(documentId: UUID, password: String?) {
         taskExecutor.execute {
             transactionTemplate.executeWithoutResult {
-                processInternal(documentId)
+                processInternal(documentId, password)
             }
         }
     }
 
-    private fun processInternal(documentId: UUID): DocumentStatusResponse {
+    private fun processInternal(documentId: UUID, password: String? = null): DocumentStatusResponse {
         val document = documentRepository.findById(documentId)
             .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Document not found") }
 
         return runCatching {
             document.status = DocumentStatus.PROCESSING
 
-            val ocr = mlServiceClient.extractText(documentId.toString(), document.storagePath, document.language)
+            val ocr = mlServiceClient.extractText(
+                documentId = documentId.toString(),
+                storagePath = document.storagePath,
+                language = document.language,
+                password = password,
+            )
             document.status = DocumentStatus.OCR_COMPLETE
             document.totalPages = ocr.total_pages
             document.backendUsed = ocr.backend
             document.pdfType = ocr.pdf_type
 
-            val tables = mlServiceClient.detectTables(documentId.toString(), document.storagePath)
+            val tables = mlServiceClient.detectTables(documentId.toString(), document.storagePath, password)
             document.status = DocumentStatus.TABLES_DETECTED
 
             val zones = mlServiceClient.classifyZones(documentId.toString(), tables.tables)
@@ -157,7 +187,7 @@ class DocumentProcessingService(
 
             document.status = DocumentStatus.READY
             document.processingTimeMs = ocr.processing_time_ms + tables.processing_time_ms + zones.processing_time_ms
-            publisher.publishEvent(DocumentProcessedEvent(documentId, document.tenantId))
+            publisher.publish(DocumentProcessedEvent(documentId, document.tenantId))
             auditService.record(
                 tenantId = document.tenantId.toString(),
                 eventType = "DOCUMENT_PROCESSED",
@@ -218,6 +248,7 @@ class DocumentProcessingService(
             pageNumber = saved.pageNumber,
             zoneType = saved.zoneType,
             zoneLabel = saved.zoneLabel,
+            boundingBox = metadataBoundingBox(saved),
             confidenceScore = saved.confidence,
             classificationMethod = metadataValue(saved, "classificationMethod"),
             detectedPeriods = metadataList(saved, "detectedPeriods"),
@@ -266,6 +297,7 @@ class DocumentProcessingService(
         pageNumber = pageNumber,
         zoneType = zoneType,
         zoneLabel = zoneLabel,
+        boundingBox = metadataBoundingBox(this),
         confidenceScore = confidence,
         classificationMethod = metadataValue(this, "classificationMethod"),
         detectedPeriods = metadataList(this, "detectedPeriods"),
@@ -283,4 +315,52 @@ class DocumentProcessingService(
 
     private fun readMetadata(zone: DetectedZone): Map<String, Any?> =
         if (zone.metadataJson.isNullOrBlank()) emptyMap() else objectMapper.readValue(zone.metadataJson, Map::class.java) as Map<String, Any?>
+
+    private fun sanitizeFilename(name: String): String {
+        val basename = name.substringAfterLast('/').substringAfterLast('\\')
+        val cleaned = basename.replace(Regex("[\\x00-\\x1f\\x7f;|&`\$!#]"), "")
+            .replace("..", "_")
+            .trim()
+        return cleaned.ifBlank { "document.pdf" }
+    }
+
+    private fun resolveUploadedByFilter(uploadedBy: String?): String? {
+        val value = uploadedBy?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        if (value.equals("ME", ignoreCase = true) || value.equals("MINE", ignoreCase = true)) {
+            val currentUser = currentUserProvider.email()?.let { userLookupFacade.findUploadedByInfo(it) }
+            return currentUser?.id?.toString()
+        }
+        return value
+    }
+
+    private fun metadataBoundingBox(zone: DetectedZone): ZoneBoundingBox? {
+        val metadata = readMetadata(zone)
+
+        val mapBox = metadata["boundingBox"] as? Map<*, *>
+        if (mapBox != null) {
+            val x = mapBox["x"].asDoubleOrNull()
+            val y = mapBox["y"].asDoubleOrNull()
+            val width = mapBox["width"].asDoubleOrNull()
+            val height = mapBox["height"].asDoubleOrNull()
+            if (x != null && y != null && width != null && height != null) {
+                return ZoneBoundingBox(x, y, width, height)
+            }
+        }
+
+        val listBox = metadata["bbox"] as? Collection<*>
+        if (listBox != null) {
+            val parts = listBox.mapNotNull { it.asDoubleOrNull() }
+            if (parts.size >= 4) {
+                return ZoneBoundingBox(parts[0], parts[1], parts[2], parts[3])
+            }
+        }
+
+        return null
+    }
+
+    private fun Any?.asDoubleOrNull(): Double? = when (this) {
+        is Number -> this.toDouble()
+        is String -> this.toDoubleOrNull()
+        else -> null
+    }
 }

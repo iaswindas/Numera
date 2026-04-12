@@ -20,6 +20,8 @@ interface CovenantMonitoringRepository : JpaRepository<CovenantMonitoringItem, U
 
     fun findByTenantIdAndStatusIn(tenantId: UUID, statuses: List<CovenantStatus>): List<CovenantMonitoringItem>
 
+    fun findByStatusIn(statuses: List<CovenantStatus>): List<CovenantMonitoringItem>
+
     /** Items past due date and not yet closed */
     @Query(
         """

@@ -9,18 +9,19 @@ import com.numera.covenant.dto.CheckerDecisionRequest
 import com.numera.covenant.dto.CovenantDocumentResponse
 import com.numera.covenant.dto.CovenantMonitoringItemResponse
 import com.numera.covenant.dto.ManualValueRequest
-import com.numera.covenant.events.CovenantBreachedEvent
-import com.numera.covenant.events.CovenantStatusChangedEvent
 import com.numera.covenant.infrastructure.CovenantDocumentRepository
 import com.numera.covenant.infrastructure.CovenantMonitoringRepository
 import com.numera.covenant.infrastructure.CovenantRepository
-import com.numera.document.infrastructure.MinioStorageClient
+import com.numera.document.StoragePort
+import com.numera.shared.events.CovenantBreachedEvent
+import com.numera.shared.events.CovenantStatusChangedEvent
 import com.numera.shared.audit.AuditAction
 import com.numera.shared.audit.AuditService
 import com.numera.shared.domain.TenantAwareEntity
+import com.numera.shared.security.TenantContext
 import com.numera.shared.exception.ApiException
 import com.numera.shared.exception.ErrorCode
-import org.springframework.context.ApplicationEventPublisher
+import com.numera.shared.infrastructure.DomainEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.multipart.MultipartFile
@@ -33,29 +34,30 @@ class CovenantMonitoringService(
     private val covenantRepository: CovenantRepository,
     private val monitoringRepository: CovenantMonitoringRepository,
     private val documentRepository: CovenantDocumentRepository,
-    private val storageClient: MinioStorageClient,
+    private val storagePort: StoragePort,
     private val auditService: AuditService,
-    private val eventPublisher: ApplicationEventPublisher,
+    private val eventPublisher: DomainEventPublisher,
 ) {
 
-    private val tenantId = TenantAwareEntity.DEFAULT_TENANT
+    private fun resolvedTenantId(): java.util.UUID =
+        TenantContext.get()?.let { java.util.UUID.fromString(it) } ?: TenantAwareEntity.DEFAULT_TENANT
 
     // ── Queries ───────────────────────────────────────────────────────────
 
     fun listByTenant(): List<CovenantMonitoringItemResponse> =
-        monitoringRepository.findByTenantId(tenantId).map { it.toResponse() }
+        monitoringRepository.findByTenantId(resolvedTenantId()).map { it.toResponse() }
 
     fun listByCovenant(covenantId: UUID): List<CovenantMonitoringItemResponse> =
         monitoringRepository.findByCovenantId(covenantId).map { it.toResponse() }
 
     fun listPending(): List<CovenantMonitoringItemResponse> =
         monitoringRepository.findByTenantIdAndStatusIn(
-            tenantId,
+            resolvedTenantId(),
             listOf(CovenantStatus.DUE, CovenantStatus.OVERDUE, CovenantStatus.REJECTED),
         ).map { it.toResponse() }
 
     fun listBreached(): List<CovenantMonitoringItemResponse> =
-        monitoringRepository.findByTenantIdAndStatus(tenantId, CovenantStatus.BREACHED).map { it.toResponse() }
+        monitoringRepository.findByTenantIdAndStatus(resolvedTenantId(), CovenantStatus.BREACHED).map { it.toResponse() }
 
     fun get(id: UUID): CovenantMonitoringItemResponse =
         monitoringRepository.findById(id)
@@ -67,6 +69,9 @@ class CovenantMonitoringService(
     /**
      * Generate monitoring items for a covenant from [fromDate] to [toDate].
      * Skips periods that already have existing items.
+     * 
+     * Skip-overlap logic: if this is a QUARTERLY covenant and there's an ANNUAL covenant
+     * for the same customer/auditMethod, skip the Q4 item to avoid duplication.
      */
     @Transactional
     fun generateMonitoringItems(covenantId: UUID, fromDate: LocalDate, toDate: LocalDate): List<CovenantMonitoringItemResponse> {
@@ -78,9 +83,16 @@ class CovenantMonitoringService(
             .map { it.periodEnd }
             .toSet()
 
-        val newItems = periods.filterNot { (_, end, _) -> end in existing }.map { (start, end, due) ->
+        // Determine if we should skip Q4 items due to overlap with ANNUAL covenant
+        val shouldSkipQ4 = shouldSkipQ4Overlap(covenant)
+
+        // Filter periods: skip existing ones, and optionally skip Q4 if overlap exists
+        val filteredPeriods = periods.filterNot { (_, end, _) -> end in existing }
+            .filterNot { (_, end, _) -> shouldSkipQ4 && isQ4Period(end, covenant.covenantCustomer.financialYearEnd) }
+
+        val newItems = filteredPeriods.map { (start, end, due) ->
             CovenantMonitoringItem().also {
-                it.tenantId = tenantId
+                it.tenantId = resolvedTenantId()
                 it.covenant = covenant
                 it.periodStart = start
                 it.periodEnd = end
@@ -90,6 +102,31 @@ class CovenantMonitoringService(
         }
 
         return monitoringRepository.saveAll(newItems).map { it.toResponse() }
+    }
+
+    /**
+     * Determine if Q4 item should be skipped for QUARTERLY covenants.
+     * Returns true if there's an ANNUAL covenant for the same customer with the same auditMethod.
+     */
+    private fun shouldSkipQ4Overlap(covenant: com.numera.covenant.domain.Covenant): Boolean {
+        if (covenant.frequency != CovenantFrequency.QUARTERLY) return false
+        
+        val otherCovenants = covenantRepository.findByCovenantCustomerIdAndIsActiveTrue(covenant.covenantCustomer.id!!)
+        return otherCovenants.any { other ->
+            other.id != covenant.id &&
+            other.frequency == CovenantFrequency.ANNUALLY &&
+            other.auditMethod == covenant.auditMethod
+        }
+    }
+
+    /**
+     * Check if a given date falls in Q4 based on the financial year end.
+     * Assumes Q4 is the last quarter (3 months) before year end.
+     */
+    private fun isQ4Period(periodEnd: LocalDate, financialYearEnd: LocalDate?): Boolean {
+        val yearEnd = financialYearEnd ?: LocalDate.of(periodEnd.year, 12, 31)
+        val q4Start = yearEnd.minusMonths(3).plusDays(1)
+        return periodEnd >= q4Start && periodEnd <= yearEnd
     }
 
     // ── Manual value override ─────────────────────────────────────────────
@@ -102,7 +139,7 @@ class CovenantMonitoringService(
         item.manualValue = request.value
         item.manualValueJustification = request.justification
         auditService.record(
-            tenantId = tenantId.toString(),
+            tenantId = resolvedTenantId().toString(),
             eventType = "MANUAL_VALUE_SET",
             action = AuditAction.OVERRIDE,
             entityType = "covenant_monitoring_item",
@@ -122,7 +159,7 @@ class CovenantMonitoringService(
             throw ApiException(ErrorCode.VALIDATION_ERROR, "Documents can only be uploaded for non-financial covenants")
         }
 
-        val storageKey = storageClient.upload(file)
+        val storageKey = storagePort.upload(file)
 
         val doc = CovenantDocument().also {
             it.monitoringItem = item
@@ -186,7 +223,7 @@ class CovenantMonitoringService(
 
     @Transactional
     fun markOverdue(): Int {
-        val items = monitoringRepository.findOverdue(tenantId, LocalDate.now())
+        val items = monitoringRepository.findOverdue(resolvedTenantId(), LocalDate.now())
         items.forEach { transitionStatus(it, CovenantStatus.OVERDUE, null) }
         monitoringRepository.saveAll(items)
         return items.size
@@ -199,9 +236,9 @@ class CovenantMonitoringService(
         item.status = newStatus
         if (previous == newStatus) return
 
-        eventPublisher.publishEvent(
+        eventPublisher.publish(
             CovenantStatusChangedEvent(
-                tenantId = tenantId,
+                tenantId = resolvedTenantId(),
                 monitoringItemId = item.id!!,
                 covenantId = item.covenant.id!!,
                 previousStatus = previous.name,
@@ -211,9 +248,9 @@ class CovenantMonitoringService(
         )
 
         if (newStatus == CovenantStatus.BREACHED) {
-            eventPublisher.publishEvent(
+            eventPublisher.publish(
                 CovenantBreachedEvent(
-                    tenantId = tenantId,
+                    tenantId = resolvedTenantId(),
                     covenantId = item.covenant.id!!,
                     monitoringItemId = item.id!!,
                     covenantName = item.covenant.name,
@@ -226,7 +263,7 @@ class CovenantMonitoringService(
         }
 
         auditService.record(
-            tenantId = tenantId.toString(),
+            tenantId = resolvedTenantId().toString(),
             eventType = "MONITORING_STATUS_CHANGED",
             action = AuditAction.UPDATE,
             entityType = "covenant_monitoring_item",

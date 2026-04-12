@@ -1,7 +1,7 @@
 package com.numera.spreading.api
 
-import com.numera.customer.infrastructure.CustomerRepository
-import com.numera.document.infrastructure.DocumentRepository
+import com.numera.customer.CustomerQueryPort
+import com.numera.document.DocumentQueryPort
 import com.numera.spreading.infrastructure.SpreadItemRepository
 import com.numera.spreading.infrastructure.SpreadValueRepository
 import java.math.BigDecimal
@@ -14,15 +14,15 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/dashboard")
 class DashboardController(
-    private val customerRepository: CustomerRepository,
-    private val documentRepository: DocumentRepository,
+    private val customerQueryPort: CustomerQueryPort,
+    private val documentQueryPort: DocumentQueryPort,
     private val spreadItemRepository: SpreadItemRepository,
     private val spreadValueRepository: SpreadValueRepository,
 ) {
     @GetMapping("/stats")
     fun stats(): Map<String, Any> {
         val spreads = spreadItemRepository.findAll().sortedByDescending { it.updatedAt }
-        val documents = documentRepository.findAll()
+        val documents = documentQueryPort.findAll()
         val allValues = spreads.flatMap { spreadValueRepository.findBySpreadItemId(it.id!!) }
         val avgAccuracy = allValues
             .mapNotNull { it.confidenceScore }
@@ -52,8 +52,8 @@ class DashboardController(
             mapOf("month" to month.toString(), "count" to count)
         }
         return mapOf(
-            "customers" to customerRepository.count(),
-            "documents" to documentRepository.count(),
+            "customers" to customerQueryPort.count(),
+            "documents" to documentQueryPort.count(),
             "spreads" to spreadItemRepository.count(),
             "aiAccuracy" to avgAccuracy,
             "avgProcessingTimeMs" to avgProcessingMs.toLong(),

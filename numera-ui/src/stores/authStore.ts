@@ -23,7 +23,7 @@ export const useAuthStore = create<AuthState>()(
       setToken: (accessToken, refreshToken) =>
         set(() => {
           if (typeof document !== 'undefined') {
-            document.cookie = `numera-auth=${accessToken}; path=/; max-age=86400; SameSite=Lax`
+            document.cookie = `numera-auth=${accessToken}; path=/; max-age=86400; SameSite=Lax; Secure`
           }
           return { accessToken, refreshToken, isAuthenticated: true }
         }),

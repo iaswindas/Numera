@@ -30,6 +30,8 @@ class PipelineRequest(BaseModel):
     storage_path: str
     language: str = "en"
     tenant_id: str | None = None
+    template_id: str | None = None
+    auth_token: str | None = None
     taxonomy_path: str | None = None
     # Skip steps (useful for partial reruns)
     skip_ocr: bool = False

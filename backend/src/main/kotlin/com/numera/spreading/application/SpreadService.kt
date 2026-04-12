@@ -2,13 +2,15 @@ package com.numera.spreading.application
 
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.numera.customer.infrastructure.CustomerRepository
-import com.numera.document.infrastructure.DocumentRepository
+import com.numera.customer.CustomerQueryPort
+import com.numera.document.DocumentQueryPort
 import com.numera.model.application.FormulaEngine
+import com.numera.model.TemplateQueryPort
 import com.numera.model.application.TemplateService
 import com.numera.shared.audit.AuditAction
 import com.numera.shared.audit.AuditService
 import com.numera.shared.domain.TenantAwareEntity
+import com.numera.shared.security.TenantContext
 import com.numera.shared.exception.ApiException
 import com.numera.shared.exception.ErrorCode
 import com.numera.spreading.domain.SpreadItem
@@ -22,14 +24,16 @@ import com.numera.spreading.dto.SpreadItemRequest
 import com.numera.spreading.dto.SpreadItemResponse
 import com.numera.spreading.dto.SpreadValueResponse
 import com.numera.spreading.dto.SpreadValueUpdateRequest
+import com.numera.spreading.dto.SpreadVarianceDto
 import com.numera.spreading.dto.SubmitSpreadRequest
 import com.numera.spreading.dto.SubmitSpreadResponse
 import com.numera.spreading.dto.VersionHistoryResponse
-import com.numera.spreading.events.SpreadSubmittedEvent
+import com.numera.spreading.events.SpreadApprovedEvent
+import com.numera.spreading.events.SpreadRejectedEvent
 import com.numera.spreading.infrastructure.SpreadItemRepository
 import com.numera.spreading.infrastructure.SpreadValueRepository
-import com.numera.model.infrastructure.TemplateRepository
-import org.springframework.context.ApplicationEventPublisher
+import com.numera.shared.events.SpreadSubmittedEvent
+import com.numera.shared.infrastructure.DomainEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -39,18 +43,19 @@ import java.util.UUID
 class SpreadService(
     private val spreadItemRepository: SpreadItemRepository,
     private val spreadValueRepository: SpreadValueRepository,
-    private val customerRepository: CustomerRepository,
-    private val documentRepository: DocumentRepository,
-    private val templateRepository: TemplateRepository,
+    private val customerQueryPort: CustomerQueryPort,
+    private val documentQueryPort: DocumentQueryPort,
+    private val templateQueryPort: TemplateQueryPort,
     private val templateService: TemplateService,
     private val formulaEngine: FormulaEngine,
     private val mappingOrchestrator: MappingOrchestrator,
     private val spreadVersionService: SpreadVersionService,
     private val auditService: AuditService,
     private val objectMapper: ObjectMapper,
-    private val eventPublisher: ApplicationEventPublisher,
+    private val eventPublisher: DomainEventPublisher,
 ) {
-    private val tenantId = TenantAwareEntity.DEFAULT_TENANT
+    private fun resolvedTenantId(): UUID =
+        TenantContext.get()?.let { UUID.fromString(it) } ?: TenantAwareEntity.DEFAULT_TENANT
 
     fun listByCustomer(customerId: UUID): List<SpreadItemResponse> =
         spreadItemRepository.findByCustomerId(customerId).map { it.toResponse() }
@@ -60,15 +65,12 @@ class SpreadService(
 
     @Transactional
     fun create(customerId: UUID, request: SpreadItemRequest): SpreadItemResponse {
-        val customer = customerRepository.findById(customerId)
-            .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Customer not found") }
-        val document = documentRepository.findById(request.documentId)
-            .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Document not found") }
-        val template = templateRepository.findById(request.templateId)
-            .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Template not found") }
+        val customer = customerQueryPort.findEntityById(customerId)
+        val document = documentQueryPort.findEntityById(request.documentId)
+        val template = templateQueryPort.findEntityById(request.templateId)
 
         val spreadItem = spreadItemRepository.save(SpreadItem().also {
-            it.tenantId = tenantId
+            it.tenantId = resolvedTenantId()
             it.customer = customer
             it.document = document
             it.template = template
@@ -82,7 +84,7 @@ class SpreadService(
         })
 
         auditService.record(
-            tenantId = tenantId.toString(),
+            tenantId = spreadItem.tenantId.toString(),
             eventType = "SPREAD_CREATED",
             action = AuditAction.CREATE,
             entityType = "spread_item",
@@ -128,6 +130,31 @@ class SpreadService(
             parentEntityType = "spread_item",
             parentEntityId = spreadItemId.toString(),
             diffJson = """[{\"field\":\"mapped_value\",\"old\":\"$old\",\"new\":\"${saved.mappedValue}\"}]""",
+        )
+
+        return saved.toResponse()
+    }
+
+    @Transactional
+    fun updateNotes(spreadItemId: UUID, valueId: UUID, notes: String): SpreadValueResponse {
+        val value = spreadValueRepository.findById(valueId)
+            .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Spread value not found") }
+        if (value.spreadItem.id != spreadItemId) {
+            throw ApiException(ErrorCode.NOT_FOUND, "Spread value does not belong to spread item")
+        }
+
+        value.notes = notes
+
+        val saved = spreadValueRepository.save(value)
+
+        auditService.record(
+            tenantId = saved.spreadItem.tenantId.toString(),
+            eventType = "SPREAD_VALUE_NOTES_UPDATED",
+            action = AuditAction.UPDATE,
+            entityType = "spread_value",
+            entityId = saved.id.toString(),
+            parentEntityType = "spread_item",
+            parentEntityId = spreadItemId.toString(),
         )
 
         return saved.toResponse()
@@ -213,7 +240,15 @@ class SpreadService(
             cellsChanged = values.count { it.manualOverride },
         )
 
-        eventPublisher.publishEvent(SpreadSubmittedEvent(spreadItemId, spread.tenantId))
+        eventPublisher.publish(
+            SpreadSubmittedEvent(
+                spreadItemId = spreadItemId,
+                tenantId = spread.tenantId,
+                customerId = spread.customer.id!!,
+                statementDate = spread.statementDate,
+                spreadValues = values.associate { it.itemCode to it.mappedValue },
+            )
+        )
 
         auditService.record(
             tenantId = spread.tenantId.toString(),
@@ -239,14 +274,146 @@ class SpreadService(
     fun rollback(spreadItemId: UUID, version: Int, comments: String): Map<String, Any> =
         spreadVersionService.rollback(spreadItemId, version, comments)
 
+    @Transactional
+    fun approveSpread(spreadId: UUID, comment: String?, approverId: UUID): SubmitSpreadResponse {
+        val spread = spreadItemRepository.findById(spreadId)
+            .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Spread item not found") }
+
+        if (spread.status != SpreadStatus.SUBMITTED) {
+            throw ApiException(
+                errorCode = ErrorCode.VALIDATION_FAILED,
+                message = "Spread must be in SUBMITTED status to approve"
+            )
+        }
+
+        spread.status = SpreadStatus.APPROVED
+        spreadItemRepository.save(spread)
+
+        val snapshot = spreadVersionService.createSnapshot(
+            spreadItemId = spreadId,
+            action = "APPROVED",
+            comments = comment,
+            createdBy = approverId.toString(),
+            cellsChanged = 0,
+        )
+
+        eventPublisher.publish(SpreadApprovedEvent(spreadId, spread.tenantId))
+
+        auditService.record(
+            tenantId = spread.tenantId.toString(),
+            eventType = "SPREAD_APPROVED",
+            action = AuditAction.APPROVE,
+            entityType = "spread_item",
+            entityId = spreadId.toString(),
+        )
+
+        return SubmitSpreadResponse(
+            status = spread.status.name,
+            version = snapshot.versionNumber,
+            validations = emptyList(),
+        )
+    }
+
+    @Transactional
+    fun rejectSpread(spreadId: UUID, comment: String, approverId: UUID): SubmitSpreadResponse {
+        val spread = spreadItemRepository.findById(spreadId)
+            .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Spread item not found") }
+
+        if (spread.status != SpreadStatus.SUBMITTED) {
+            throw ApiException(
+                errorCode = ErrorCode.VALIDATION_FAILED,
+                message = "Spread must be in SUBMITTED status to reject"
+            )
+        }
+
+        if (comment.isBlank()) {
+            throw ApiException(
+                errorCode = ErrorCode.VALIDATION_FAILED,
+                message = "Comment is required for rejection"
+            )
+        }
+
+        spread.status = SpreadStatus.DRAFT
+        spreadItemRepository.save(spread)
+
+        val snapshot = spreadVersionService.createSnapshot(
+            spreadItemId = spreadId,
+            action = "REJECTED",
+            comments = comment,
+            createdBy = approverId.toString(),
+            cellsChanged = 0,
+        )
+
+        eventPublisher.publish(SpreadRejectedEvent(spreadId, spread.tenantId))
+
+        auditService.record(
+            tenantId = spread.tenantId.toString(),
+            eventType = "SPREAD_REJECTED",
+            action = AuditAction.REJECT,
+            entityType = "spread_item",
+            entityId = spreadId.toString(),
+        )
+
+        return SubmitSpreadResponse(
+            status = spread.status.name,
+            version = snapshot.versionNumber,
+            validations = emptyList(),
+        )
+    }
+
+    fun getVariance(spreadId: UUID, compareSpreadId: UUID): List<SpreadVarianceDto> {
+        val spread = spreadItemRepository.findById(spreadId)
+            .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Spread item not found") }
+        val compareSpread = spreadItemRepository.findById(compareSpreadId)
+            .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Compare spread item not found") }
+
+        if (spread.tenantId != compareSpread.tenantId) {
+            throw ApiException(ErrorCode.FORBIDDEN, "Cannot compare spreads from different tenants")
+        }
+
+        val currentValues = spreadValueRepository.findBySpreadItemId(spreadId).associateBy { it.itemCode }
+        val compareValues = spreadValueRepository.findBySpreadItemId(compareSpreadId).associateBy { it.itemCode }
+
+        return currentValues.keys.union(compareValues.keys).sorted().map { itemCode ->
+            val current = currentValues[itemCode]
+            val compare = compareValues[itemCode]
+            val currentValue = current?.mappedValue
+            val compareValue = compare?.mappedValue
+            val absoluteChange = when {
+                currentValue != null && compareValue != null -> currentValue.subtract(compareValue)
+                currentValue != null -> currentValue
+                compareValue != null -> compareValue.negate()
+                else -> null
+            }
+            val percentageChange = when {
+                compareValue != null && compareValue.compareTo(BigDecimal.ZERO) != 0 && absoluteChange != null ->
+                    absoluteChange.divide(compareValue.abs(), 4, java.math.RoundingMode.HALF_UP).multiply(BigDecimal(100))
+                else -> null
+            }
+
+            SpreadVarianceDto(
+                lineItemId = current?.lineItemId?.toString() ?: compare?.lineItemId?.toString() ?: "",
+                lineItemCode = itemCode,
+                lineItemLabel = current?.label ?: compare?.label ?: "",
+                currentValue = currentValue,
+                compareValue = compareValue,
+                absoluteChange = absoluteChange,
+                percentageChange = percentageChange,
+            )
+        }
+    }
+
     private fun SpreadItem.toResponse() = SpreadItemResponse(
         id = id.toString(),
         customerId = customer.id.toString(),
         documentId = document.id.toString(),
+        templateId = template.id?.toString(),
         statementDate = statementDate.toString(),
         status = status,
         currentVersion = currentVersion,
         createdAt = createdAt.toString(),
+        baseSpreadId = baseSpread?.id?.toString(),
+        periodSequence = periodSequence,
     )
 
     private fun SpreadValue.toResponse(): SpreadValueResponse {
@@ -264,6 +431,9 @@ class SpreadService(
             confidenceLevel = confidenceLevel,
             sourcePage = sourcePage,
             sourceText = sourceText,
+            sourceDocumentName = sourceDocumentName,
+            sourceBbox = sourceBbox,
+            notes = notes,
             isManualOverride = manualOverride,
             isAutofilled = autofilled,
             isFormulaCell = formulaCell,

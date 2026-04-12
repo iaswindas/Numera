@@ -5,6 +5,7 @@ import com.numera.customer.dto.CustomerRequest
 import com.numera.customer.dto.CustomerResponse
 import com.numera.customer.dto.CustomerSearchRequest
 import com.numera.shared.domain.TenantAwareEntity
+import com.numera.shared.security.TenantContext
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -24,21 +25,22 @@ import java.util.UUID
 class CustomerController(
     private val customerService: CustomerService,
 ) {
-    private val tenantId = TenantAwareEntity.DEFAULT_TENANT
+    private fun resolvedTenantId(): UUID =
+        TenantContext.get()?.let { UUID.fromString(it) } ?: TenantAwareEntity.DEFAULT_TENANT
 
     @GetMapping
     fun list(
         @RequestParam(required = false) query: String?,
         @RequestParam(required = false) industry: String?,
         @RequestParam(required = false) country: String?,
-    ): List<CustomerResponse> = customerService.search(tenantId, CustomerSearchRequest(query, industry, country))
+    ): List<CustomerResponse> = customerService.search(resolvedTenantId(), CustomerSearchRequest(query, industry, country))
 
     @GetMapping("/{id}")
     fun get(@PathVariable id: UUID): CustomerResponse = customerService.findById(id)
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    fun create(@Valid @RequestBody request: CustomerRequest): CustomerResponse = customerService.create(tenantId, request)
+    fun create(@Valid @RequestBody request: CustomerRequest): CustomerResponse = customerService.create(resolvedTenantId(), request)
 
     @PutMapping("/{id}")
     fun update(@PathVariable id: UUID, @Valid @RequestBody request: CustomerRequest): CustomerResponse =

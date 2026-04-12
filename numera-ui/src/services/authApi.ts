@@ -35,7 +35,15 @@ export function useLogout() {
   const { logout } = useAuthStore()
 
   return useMutation({
-    mutationFn: async () => true,
+    mutationFn: async () => {
+      // Revoke refresh tokens server-side (V-12)
+      try {
+        await fetchApi('/auth/logout', { method: 'POST' })
+      } catch {
+        // Proceed with client-side logout even if server call fails
+      }
+      return true
+    },
     onSettled: () => logout(),
   })
 }

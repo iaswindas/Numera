@@ -1,12 +1,87 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchApi } from './api'
-import type { MappingResult, SpreadItem, SpreadValue, VersionHistoryResponse } from '@/types/spread'
+import type { MappingResult, SpreadItem, SpreadValue, SpreadVarianceDto, VersionHistoryResponse } from '@/types/spread'
+
+interface PendingApprovalItem {
+  id: string
+  customerId: string
+  statementDate: string
+  status: string
+  createdAt: string
+  currentVersion: number
+}
 
 export function useSpreadItem(spreadId: string) {
   return useQuery({
     queryKey: ['spread', spreadId],
     queryFn: () => fetchApi<SpreadItem>(`/spread-items/${spreadId}`),
     enabled: !!spreadId,
+  })
+}
+
+// ── Spread Approval Workflow ────────────────────────────────────────
+
+export function usePendingApprovals() {
+  return useQuery({
+    queryKey: ['spreads', 'pending-approvals'],
+    queryFn: () => fetchApi<PendingApprovalItem[]>(`/spread-items?status=SUBMITTED`),
+  })
+}
+
+export function useApproveSpread() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ spreadId, approverComment }: { spreadId: string; approverComment?: string }) =>
+      fetchApi(`/spread-items/${spreadId}/approve`, {
+        method: 'POST',
+        ...(approverComment ? { params: { comment: approverComment } } : {}),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['spreads', 'pending-approvals'] })
+      queryClient.invalidateQueries({ queryKey: ['spreads'] })
+    },
+  })
+}
+
+export function useRejectSpread() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ spreadId, rejectionReason }: { spreadId: string; rejectionReason: string }) =>
+      fetchApi(`/spread-items/${spreadId}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ comment: rejectionReason }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['spreads', 'pending-approvals'] })
+      queryClient.invalidateQueries({ queryKey: ['spreads'] })
+    },
+  })
+}
+
+// ── Variance ───────────────────────────────────────────────────────
+
+export function useSpreadVariance(spreadId: string, compareSpreadId: string) {
+  return useQuery({
+    queryKey: ['spread', spreadId, 'variance', compareSpreadId],
+    queryFn: () =>
+      fetchApi<SpreadVarianceDto[]>(`/spread-items/${spreadId}/variance?compareSpreadId=${compareSpreadId}`),
+    enabled: !!spreadId && !!compareSpreadId,
+  })
+}
+
+// ── Notes ──────────────────────────────────────────────────────────
+
+export function useUpdateSpreadValueNotes(spreadId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ valueId, notes }: { valueId: string; notes: string }) =>
+      fetchApi(`/spread-items/${spreadId}/values/${valueId}/notes`, {
+        method: 'PUT',
+        body: JSON.stringify({ notes }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['spread', spreadId, 'values'] })
+    },
   })
 }
 
@@ -161,5 +236,30 @@ export function useSpreadValidation(spreadId: string) {
     queryKey: ['spread', spreadId, 'validation'],
     queryFn: () => fetchApi<MappingResult>(`/spread-items/${spreadId}/process`, { method: 'POST' }),
     enabled: false, // manually triggered
+  })
+}
+
+// ── Subsequent Spreading ──────────────────────────────────────────────
+
+export function useBasePeriod(spreadId: string) {
+  return useQuery({
+    queryKey: ['spread', spreadId, 'base-period'],
+    queryFn: () => fetchApi<{ basePeriodId: string | null }>(`/spread-items/${spreadId}/base-period`),
+    enabled: !!spreadId,
+  })
+}
+
+export function useAutofillFromBase(spreadId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (baseSpreadId: string) =>
+      fetchApi<{ filledCount: number; baseSpreadId: string }>(`/spread-items/${spreadId}/autofill`, {
+        method: 'POST',
+        body: JSON.stringify({ baseSpreadId }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['spread', spreadId] })
+      queryClient.invalidateQueries({ queryKey: ['spread', spreadId, 'values'] })
+    },
   })
 }

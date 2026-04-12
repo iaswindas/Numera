@@ -18,6 +18,7 @@ import com.numera.customer.infrastructure.CustomerRepository
 import com.numera.shared.audit.AuditAction
 import com.numera.shared.audit.AuditService
 import com.numera.shared.domain.TenantAwareEntity
+import com.numera.shared.security.TenantContext
 import com.numera.shared.exception.ApiException
 import com.numera.shared.exception.ErrorCode
 import org.springframework.stereotype.Service
@@ -32,12 +33,13 @@ class CovenantService(
     private val auditService: AuditService,
 ) {
 
-    private val tenantId = TenantAwareEntity.DEFAULT_TENANT
+    private fun resolvedTenantId(): java.util.UUID =
+        TenantContext.get()?.let { java.util.UUID.fromString(it) } ?: TenantAwareEntity.DEFAULT_TENANT
 
     // ── Covenant Customers ────────────────────────────────────────────────
 
     fun listCovenantCustomers(query: String?): List<CovenantCustomerResponse> =
-        covenantCustomerRepository.search(tenantId, query).map { it.toResponse() }
+        covenantCustomerRepository.search(resolvedTenantId(), query).map { it.toResponse() }
 
     fun getCovenantCustomer(id: UUID): CovenantCustomerResponse =
         covenantCustomerRepository.findById(id)
@@ -49,11 +51,11 @@ class CovenantService(
         val customer = customerRepository.findById(request.customerId)
             .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Customer not found: ${request.customerId}") }
 
-        val existing = covenantCustomerRepository.findByTenantIdAndCustomerId(tenantId, request.customerId)
+        val existing = covenantCustomerRepository.findByTenantIdAndCustomerId(resolvedTenantId(), request.customerId)
         if (existing != null) throw ApiException(ErrorCode.CONFLICT, "Covenant customer already exists for this customer")
 
         val cc = CovenantCustomer().also {
-            it.tenantId = tenantId
+            it.tenantId = resolvedTenantId()
             it.customer = customer
             it.rimId = request.rimId
             it.clEntityId = request.clEntityId
@@ -63,7 +65,7 @@ class CovenantService(
 
         val saved = covenantCustomerRepository.save(cc)
         auditService.record(
-            tenantId = tenantId.toString(),
+            tenantId = resolvedTenantId().toString(),
             eventType = "COVENANT_CUSTOMER_CREATED",
             action = AuditAction.CREATE,
             entityType = "covenant_customer",
@@ -85,7 +87,7 @@ class CovenantService(
 
         val saved = covenantCustomerRepository.save(cc)
         auditService.record(
-            tenantId = tenantId.toString(),
+            tenantId = resolvedTenantId().toString(),
             eventType = "COVENANT_CUSTOMER_UPDATED",
             action = AuditAction.UPDATE,
             entityType = "covenant_customer",
@@ -118,7 +120,7 @@ class CovenantService(
             .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Covenant customer not found: ${request.covenantCustomerId}") }
 
         val covenant = Covenant().also {
-            it.tenantId = tenantId
+            it.tenantId = resolvedTenantId()
             it.covenantCustomer = cc
             it.covenantType = CovenantType.valueOf(request.covenantType)
             it.name = request.name
@@ -131,11 +133,14 @@ class CovenantService(
             it.thresholdMax = request.thresholdMax
             it.documentType = request.documentType
             it.itemType = request.itemType
+            it.auditMethod = request.auditMethod
+            it.reminderDaysBefore = request.reminderDaysBefore
+            it.reminderDaysAfter = request.reminderDaysAfter
         }
 
         val saved = covenantRepository.save(covenant)
         auditService.record(
-            tenantId = tenantId.toString(),
+            tenantId = resolvedTenantId().toString(),
             eventType = "COVENANT_CREATED",
             action = AuditAction.CREATE,
             entityType = "covenant",
@@ -159,10 +164,13 @@ class CovenantService(
         covenant.thresholdMax = request.thresholdMax
         covenant.documentType = request.documentType
         covenant.itemType = request.itemType
+        covenant.auditMethod = request.auditMethod
+        covenant.reminderDaysBefore = request.reminderDaysBefore
+        covenant.reminderDaysAfter = request.reminderDaysAfter
 
         val saved = covenantRepository.save(covenant)
         auditService.record(
-            tenantId = tenantId.toString(),
+            tenantId = resolvedTenantId().toString(),
             eventType = "COVENANT_UPDATED",
             action = AuditAction.UPDATE,
             entityType = "covenant",
@@ -178,7 +186,7 @@ class CovenantService(
         covenant.isActive = false
         covenantRepository.save(covenant)
         auditService.record(
-            tenantId = tenantId.toString(),
+            tenantId = resolvedTenantId().toString(),
             eventType = "COVENANT_DEACTIVATED",
             action = AuditAction.DELETE,
             entityType = "covenant",
@@ -232,6 +240,9 @@ class CovenantService(
         thresholdMax = thresholdMax,
         documentType = documentType,
         itemType = itemType,
+        auditMethod = auditMethod,
+        reminderDaysBefore = reminderDaysBefore,
+        reminderDaysAfter = reminderDaysAfter,
         isActive = isActive,
         createdAt = createdAt,
     )

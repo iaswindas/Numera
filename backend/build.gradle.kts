@@ -32,6 +32,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-websocket")
     implementation("org.springframework.boot:spring-boot-starter-mail")
+    implementation("org.springframework.boot:spring-boot-starter-amqp")
 
     implementation("org.springframework.modulith:spring-modulith-starter-core")
     implementation("org.springframework.modulith:spring-modulith-starter-jpa")
@@ -48,6 +49,16 @@ dependencies {
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
+
+    // SSO: OAuth2/OIDC + SAML 2.0
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
+
+    // MFA: TOTP (Google Authenticator compatible)
+    implementation("dev.samstevens.totp:totp:1.7.1")
+
+    // Word/Excel parsing (used in taxonomy bulk upload endpoint)
+    implementation("org.apache.poi:poi-ooxml:5.3.0")
+    implementation("com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10")
 
     implementation("org.springframework.boot:spring-boot-starter-webflux")
 

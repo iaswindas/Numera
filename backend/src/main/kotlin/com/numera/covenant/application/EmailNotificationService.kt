@@ -1,7 +1,7 @@
 package com.numera.covenant.application
 
-import com.numera.covenant.events.CovenantBreachedEvent
-import com.numera.covenant.events.CovenantStatusChangedEvent
+import com.numera.shared.events.CovenantBreachedEvent
+import com.numera.shared.events.CovenantStatusChangedEvent
 import com.numera.covenant.infrastructure.CovenantMonitoringRepository
 import com.numera.covenant.infrastructure.EmailTemplateRepository
 import org.slf4j.LoggerFactory

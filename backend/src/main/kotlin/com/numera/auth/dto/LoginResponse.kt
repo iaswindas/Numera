@@ -5,5 +5,6 @@ data class LoginResponse(
     val refreshToken: String,
     val tokenType: String = "Bearer",
     val expiresInSec: Long,
+    val passwordExpired: Boolean = false,
     val user: UserProfile,
 )

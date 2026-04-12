@@ -1,6 +1,7 @@
 package com.numera.shared.exception
 
 import jakarta.persistence.EntityNotFoundException
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.MethodArgumentNotValidException
@@ -9,6 +10,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     @ExceptionHandler(ApiException::class)
     fun handleApiException(ex: ApiException): ResponseEntity<ErrorResponse> {
@@ -37,7 +40,10 @@ class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception::class)
-    fun handleFallback(ex: Exception): ResponseEntity<ErrorResponse> =
-        ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(ErrorResponse(ErrorCode.INTERNAL_ERROR, ex.message ?: "Unexpected error"))
+    fun handleFallback(ex: Exception): ResponseEntity<ErrorResponse> {
+        // V-13: Log full exception server-side, return generic message to client
+        log.error("Unhandled exception: {}", ex.message, ex)
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(ErrorResponse(ErrorCode.INTERNAL_ERROR, "An unexpected error occurred. Please try again later."))
+    }
 }

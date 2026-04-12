@@ -11,6 +11,7 @@ import com.numera.covenant.infrastructure.SignatureRepository
 import com.numera.shared.audit.AuditAction
 import com.numera.shared.audit.AuditService
 import com.numera.shared.domain.TenantAwareEntity
+import com.numera.shared.security.TenantContext
 import com.numera.shared.exception.ApiException
 import com.numera.shared.exception.ErrorCode
 import org.springframework.stereotype.Service
@@ -24,12 +25,13 @@ class EmailTemplateService(
     private val auditService: AuditService,
 ) {
 
-    private val tenantId = TenantAwareEntity.DEFAULT_TENANT
+    private fun resolvedTenantId(): java.util.UUID =
+        TenantContext.get()?.let { java.util.UUID.fromString(it) } ?: TenantAwareEntity.DEFAULT_TENANT
 
     // ── Email Templates ───────────────────────────────────────────────────
 
     fun listTemplates(): List<EmailTemplateResponse> =
-        emailTemplateRepository.findByTenantIdAndIsActiveTrue(tenantId).map { it.toResponse() }
+        emailTemplateRepository.findByTenantIdAndIsActiveTrue(resolvedTenantId()).map { it.toResponse() }
 
     fun getTemplate(id: UUID): EmailTemplateResponse =
         emailTemplateRepository.findById(id)
@@ -39,7 +41,7 @@ class EmailTemplateService(
     @Transactional
     fun createTemplate(request: EmailTemplateRequest, actorId: UUID?): EmailTemplateResponse {
         val saved = emailTemplateRepository.save(EmailTemplate().also {
-            it.tenantId = tenantId
+            it.tenantId = resolvedTenantId()
             it.name = request.name
             it.covenantType = request.covenantType
             it.templateCategory = request.templateCategory
@@ -48,7 +50,7 @@ class EmailTemplateService(
             it.createdBy = actorId
         })
         auditService.record(
-            tenantId = tenantId.toString(),
+            tenantId = resolvedTenantId().toString(),
             eventType = "EMAIL_TEMPLATE_CREATED",
             action = AuditAction.CREATE,
             entityType = "email_template",
@@ -70,7 +72,7 @@ class EmailTemplateService(
 
         val saved = emailTemplateRepository.save(template)
         auditService.record(
-            tenantId = tenantId.toString(),
+            tenantId = resolvedTenantId().toString(),
             eventType = "EMAIL_TEMPLATE_UPDATED",
             action = AuditAction.UPDATE,
             entityType = "email_template",
@@ -90,7 +92,7 @@ class EmailTemplateService(
     // ── Signatures ────────────────────────────────────────────────────────
 
     fun listSignatures(): List<SignatureResponse> =
-        signatureRepository.findByTenantIdAndIsActiveTrue(tenantId).map { it.toResponse() }
+        signatureRepository.findByTenantIdAndIsActiveTrue(resolvedTenantId()).map { it.toResponse() }
 
     fun getSignature(id: UUID): SignatureResponse =
         signatureRepository.findById(id)
@@ -100,13 +102,14 @@ class EmailTemplateService(
     @Transactional
     fun createSignature(request: SignatureRequest, actorId: UUID?): SignatureResponse {
         val saved = signatureRepository.save(Signature().also {
-            it.tenantId = tenantId
+            it.tenantId = resolvedTenantId()
             it.name = request.name
+            it.title = request.title
             it.htmlContent = request.htmlContent
             it.createdBy = actorId
         })
         auditService.record(
-            tenantId = tenantId.toString(),
+            tenantId = resolvedTenantId().toString(),
             eventType = "SIGNATURE_CREATED",
             action = AuditAction.CREATE,
             entityType = "signature",
@@ -120,6 +123,7 @@ class EmailTemplateService(
         val sig = signatureRepository.findById(id)
             .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Signature not found: $id") }
         sig.name = request.name
+        sig.title = request.title
         sig.htmlContent = request.htmlContent
         return signatureRepository.save(sig).toResponse()
     }
@@ -148,6 +152,7 @@ class EmailTemplateService(
     private fun Signature.toResponse() = SignatureResponse(
         id = id!!,
         name = name,
+        title = title,
         htmlContent = htmlContent,
         isActive = isActive,
         createdAt = createdAt,

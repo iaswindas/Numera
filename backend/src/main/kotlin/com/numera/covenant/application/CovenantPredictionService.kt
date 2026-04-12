@@ -1,12 +1,22 @@
 package com.numera.covenant.application
 
 import com.numera.covenant.domain.CovenantStatus
+import com.numera.covenant.domain.CovenantThresholdOperator
+import com.numera.covenant.dto.CovenantPredictionHistoryPoint
 import com.numera.covenant.infrastructure.CovenantMonitoringRepository
+import com.numera.document.CovenantPredictionPort
+import com.numera.document.CovenantPredictionRequest
+import com.numera.document.RSBSNPredictionRequest
+import com.numera.document.CovenantPredictionHistoryPoint as DocumentPredictionHistoryPoint
+import com.numera.shared.config.FeatureFlagService
 import com.numera.shared.domain.TenantAwareEntity
+import com.numera.shared.security.TenantContext
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.math.MathContext
+import java.math.RoundingMode
 import java.util.UUID
 
 /**
@@ -22,9 +32,13 @@ import java.util.UUID
 @Service
 class CovenantPredictionService(
     private val monitoringRepository: CovenantMonitoringRepository,
+    private val covenantPredictionPort: CovenantPredictionPort,
+    private val featureFlags: FeatureFlagService,
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
 
-    private val tenantId = TenantAwareEntity.DEFAULT_TENANT
+    private fun resolvedTenantId(): java.util.UUID =
+        TenantContext.get()?.let { java.util.UUID.fromString(it) } ?: TenantAwareEntity.DEFAULT_TENANT
 
     /**
      * Recalculate breach probability for all active monitoring items
@@ -32,22 +46,22 @@ class CovenantPredictionService(
      */
     @Transactional
     fun recalculateAllProbabilities() {
-        val items = monitoringRepository.findByTenantId(tenantId)
+        val items = monitoringRepository.findByTenantId(resolvedTenantId())
             .filter { it.status !in listOf(CovenantStatus.CLOSED, CovenantStatus.MET) }
 
         items.forEach { item ->
-            val history = monitoringRepository.findByCovenantId(item.covenant.id!!)
-                .mapNotNull { it.calculatedValue ?: it.manualValue }
-                .takeLast(8)
+            val points = monitoringRepository.findByCovenantId(item.covenant.id!!)
+                .sortedBy { it.periodEnd }
+                .mapNotNull { monitoring ->
+                    val value = monitoring.calculatedValue ?: monitoring.manualValue ?: return@mapNotNull null
+                    CovenantPredictionHistoryPoint(
+                        period = formatQuarter(monitoring.periodEnd),
+                        value = value,
+                    )
+                }
+                .takeLast(12)
 
-            if (history.size >= 2) {
-                val probability = estimateBreachProbability(
-                    values = history,
-                    threshold = item.covenant.thresholdValue,
-                    operator = item.covenant.operator?.name,
-                )
-                item.breachProbability = probability
-            }
+            item.breachProbability = predictWithFallback(item.covenant.id!!, points, item.covenant.thresholdValue, item.covenant.operator)
         }
 
         monitoringRepository.saveAll(items)
@@ -99,5 +113,73 @@ class CovenantPredictionService(
             (BigDecimal("0.5") + trendStrength.multiply(BigDecimal("0.5"))).min(BigDecimal.ONE)
         else
             (BigDecimal("0.5") - trendStrength.multiply(BigDecimal("0.5"))).max(BigDecimal.ZERO)
+    }
+
+    private fun predictWithFallback(
+        covenantId: UUID,
+        history: List<CovenantPredictionHistoryPoint>,
+        threshold: BigDecimal?,
+        operator: CovenantThresholdOperator?,
+    ): BigDecimal {
+        val values = history.map { it.value }
+        if (threshold == null || operator == null || history.size < 3) {
+            return estimateBreachProbability(values, threshold, operator?.name)
+        }
+
+        val direction = when (operator) {
+            CovenantThresholdOperator.GTE -> "MIN"
+            CovenantThresholdOperator.LTE -> "MAX"
+            else -> null
+        }
+
+        if (direction == null) {
+            return estimateBreachProbability(values, threshold, operator.name)
+        }
+
+        val tenantId = runCatching { resolvedTenantId().toString() }.getOrNull()
+
+        // Try RS-BSN predictor first when feature flag is enabled
+        if (featureFlags.isEnabled("rsBsnPredictor", tenantId)) {
+            val rsbsnResult = runCatching {
+                val request = RSBSNPredictionRequest(
+                    covenantId = covenantId.toString(),
+                    threshold = threshold,
+                    direction = direction,
+                    history = values.map { it.toFloat() },
+                    periodsAhead = 4,
+                )
+                covenantPredictionPort.predictCovenantBreachRSBSN(request).breachProbability
+                    .coerceIn(BigDecimal.ZERO, BigDecimal.ONE)
+                    .setScale(4, RoundingMode.HALF_UP)
+            }
+            rsbsnResult.onSuccess { return it }
+            rsbsnResult.onFailure {
+                logger.warn("RS-BSN prediction failed for covenantId={}, falling back to basic ML", covenantId, it)
+            }
+        }
+
+        // Fallback: basic ML prediction
+        val request = CovenantPredictionRequest(
+            covenantId = covenantId.toString(),
+            threshold = threshold,
+            direction = direction,
+            history = history.map { DocumentPredictionHistoryPoint(period = it.period, value = it.value) },
+            periodsAhead = 4,
+        )
+
+        return runCatching {
+            covenantPredictionPort.predictCovenantBreach(request).breachProbability
+                .coerceIn(BigDecimal.ZERO, BigDecimal.ONE)
+                .setScale(4, RoundingMode.HALF_UP)
+        }.onFailure {
+            logger.warn("ML covenant prediction unavailable for covenantId={}, using fallback", covenantId)
+        }.getOrElse {
+            estimateBreachProbability(values, threshold, operator.name)
+        }
+    }
+
+    private fun formatQuarter(date: java.time.LocalDate): String {
+        val quarter = ((date.monthValue - 1) / 3) + 1
+        return "${date.year}-Q$quarter"
     }
 }

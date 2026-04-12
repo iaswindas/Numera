@@ -40,4 +40,17 @@ class AuditEvent : BaseEntity() {
 
     @Column(nullable = false, length = 128)
     var currentHash: String = ""
+
+    // ZK-RFA fields (nullable — populated only when zkRfaAudit feature flag is enabled)
+    @Column(columnDefinition = "text")
+    var chameleonRandomness: String? = null
+
+    @Column
+    var mmrIndex: Long? = null
+
+    @Column(length = 128)
+    var mmrRoot: String? = null
+
+    @Column(columnDefinition = "text")
+    var mmrProofJson: String? = null
 }

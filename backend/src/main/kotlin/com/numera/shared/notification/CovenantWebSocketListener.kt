@@ -1,7 +1,7 @@
 package com.numera.shared.notification
 
-import com.numera.covenant.events.CovenantBreachedEvent
-import com.numera.covenant.events.CovenantStatusChangedEvent
+import com.numera.shared.events.CovenantBreachedEvent
+import com.numera.shared.events.CovenantStatusChangedEvent
 import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component

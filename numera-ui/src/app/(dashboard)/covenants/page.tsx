@@ -1,14 +1,17 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Send } from 'lucide-react'
 import { useCovenantCustomers, useCovenantDefinitions, useMonitoringItems, useWaiverRequest } from '@/services/covenantApi'
 import { useAuthStore } from '@/stores/authStore'
 import { useToast } from '@/components/ui/Toast'
+import { useWebSocketSubscription } from '@/hooks/useWebSocket'
 
 export default function CovenantItemsPage() {
   const { user } = useAuthStore()
   const { showToast } = useToast()
+  const queryClient = useQueryClient()
   const [selectedCustomerId, setSelectedCustomerId] = useState('')
 
   const customersQuery = useCovenantCustomers()
@@ -19,6 +22,10 @@ export default function CovenantItemsPage() {
   const customers = (customersQuery.data as Array<{ id: string; customerName: string }> | undefined) ?? []
   const monitoring = (monitoringQuery.data as Array<{ id: string; covenantName: string; status: string; periodEnd: string; dueDate: string; breachProbability?: number }> | undefined) ?? []
   const definitions = (definitionsQuery.data as Array<{ id: string; name: string; frequency: string; covenantType: string; isActive: boolean }> | undefined) ?? []
+
+  useWebSocketSubscription(user?.tenantId ? `/topic/tenant/${user.tenantId}/covenants` : null, () => {
+    void queryClient.invalidateQueries({ queryKey: ['covenant'] })
+  })
 
   const breached = useMemo(() => monitoring.filter((m) => m.status === 'BREACHED'), [monitoring])
 

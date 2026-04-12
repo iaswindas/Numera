@@ -30,7 +30,12 @@ class MlServiceClient(
         var openedUntilEpochMs: Long = 0,
     )
 
-    data class OcrRequest(val document_id: String, val storage_path: String, val language: String = "en")
+    data class OcrRequest(
+        val document_id: String,
+        val storage_path: String,
+        val language: String = "en",
+        val password: String? = null,
+    )
     data class OcrTextBlock(val text: String, val confidence: Float, val bbox: List<Float>, val page: Int)
     data class OcrResponse(
         val document_id: String,
@@ -44,16 +49,25 @@ class MlServiceClient(
         val pages_failed: Int = 0,
     )
 
-    fun extractText(documentId: String, storagePath: String, language: String = "en"): OcrResponse =
+    fun extractText(
+        documentId: String,
+        storagePath: String,
+        language: String = "en",
+        password: String? = null,
+    ): OcrResponse =
         executeWithResilience("ocr") {
             ocrClient.post().uri("ocr/extract")
-                .bodyValue(OcrRequest(documentId, storagePath, language))
+                .bodyValue(OcrRequest(documentId, storagePath, language, password))
                 .retrieve().bodyToMono(OcrResponse::class.java)
                 .withMlResilience("ocr.extractText")
                 .block()!!
         }
 
-    data class TableDetectRequest(val document_id: String, val storage_path: String)
+    data class TableDetectRequest(
+        val document_id: String,
+        val storage_path: String,
+        val password: String? = null,
+    )
     data class TableDetectResponse(
         val document_id: String,
         val total_pages: Int,
@@ -65,12 +79,57 @@ class MlServiceClient(
         val tables_filtered: Int = 0,
     )
 
-    fun detectTables(documentId: String, storagePath: String): TableDetectResponse =
+    fun detectTables(documentId: String, storagePath: String, password: String? = null): TableDetectResponse =
         executeWithResilience("ocr") {
             ocrClient.post().uri("ocr/tables/detect")
-                .bodyValue(TableDetectRequest(documentId, storagePath))
+                .bodyValue(TableDetectRequest(documentId, storagePath, password))
                 .retrieve().bodyToMono(TableDetectResponse::class.java)
                 .withMlResilience("ocr.detectTables")
+                .block()!!
+        }
+
+    data class CovenantPredictionRequest(
+        val covenantId: String,
+        val threshold: java.math.BigDecimal,
+        val direction: String,
+        val history: List<CovenantPredictionHistoryPoint>,
+        val periodsAhead: Int = 4,
+    )
+
+    data class CovenantPredictionHistoryPoint(
+        val period: String,
+        val value: java.math.BigDecimal,
+    )
+
+    data class CovenantPredictionResponse(
+        val breachProbability: java.math.BigDecimal,
+        val confidenceInterval: CovenantPredictionConfidenceInterval,
+        val forecast: List<CovenantPredictionForecastPoint>,
+        val factors: List<CovenantPredictionFactor>,
+    )
+
+    data class CovenantPredictionConfidenceInterval(
+        val lower: java.math.BigDecimal,
+        val upper: java.math.BigDecimal,
+    )
+
+    data class CovenantPredictionForecastPoint(
+        val period: String,
+        val expectedValue: java.math.BigDecimal,
+        val breachRisk: java.math.BigDecimal,
+    )
+
+    data class CovenantPredictionFactor(
+        val name: String,
+        val impact: java.math.BigDecimal,
+    )
+
+    fun predictCovenantBreach(request: CovenantPredictionRequest): CovenantPredictionResponse =
+        executeWithResilience("ml") {
+            mlClient.post().uri("ml/covenant/predict")
+                .bodyValue(request)
+                .retrieve().bodyToMono(CovenantPredictionResponse::class.java)
+                .withMlResilience("ml.predictCovenantBreach")
                 .block()!!
         }
 
@@ -248,6 +307,91 @@ class MlServiceClient(
                 .bodyValue(FeedbackRequest(corrections))
                 .retrieve().bodyToMono(FeedbackResponse::class.java)
                 .withMlResilience("ml.submitFeedback")
+                .block()!!
+        }
+
+    // ── RS-BSN Covenant Prediction ──────────────────────────────────────
+
+    data class RSBSNPredictionRequest(
+        val covenant_id: String,
+        val threshold: java.math.BigDecimal,
+        val direction: String,
+        val history: List<Float>,
+        val periods_ahead: Int = 4,
+    )
+
+    data class RSBSNForecastPoint(
+        val period: Int,
+        val expected_value: java.math.BigDecimal,
+        val breach_risk: java.math.BigDecimal,
+    )
+
+    data class RSBSNRegimeDetection(
+        val regime: String,
+        val probability: java.math.BigDecimal,
+        val transition_matrix: List<List<Float>>,
+    )
+
+    data class RSBSNPredictionResponse(
+        val breach_probability: java.math.BigDecimal,
+        val confidence_interval: RSBSNConfidenceInterval,
+        val forecasts: List<RSBSNForecastPoint>,
+        val regime_detection: RSBSNRegimeDetection,
+        val factors: List<String>,
+    )
+
+    data class RSBSNConfidenceInterval(
+        val lower: java.math.BigDecimal,
+        val upper: java.math.BigDecimal,
+    )
+
+    fun predictCovenantBreachRSBSN(request: RSBSNPredictionRequest): RSBSNPredictionResponse =
+        executeWithResilience("ml") {
+            mlClient.post().uri("ml/covenants/predict")
+                .bodyValue(request)
+                .retrieve().bodyToMono(RSBSNPredictionResponse::class.java)
+                .withMlResilience("ml.predictCovenantBreachRSBSN")
+                .block()!!
+        }
+
+    // ── OW-PGGR Anomaly Detection ──────────────────────────────────────
+
+    data class SpreadValueDto(
+        val line_item_id: String,
+        val label: String,
+        val value: java.math.BigDecimal?,
+        val zone_type: String? = null,
+    )
+
+    data class AnomalyDetectionRequest(
+        val spread_values: List<SpreadValueDto>,
+        val historical_values: List<List<java.math.BigDecimal?>> = emptyList(),
+        val template_validations: List<Map<String, Any>> = emptyList(),
+    )
+
+    data class AnomalyDto(
+        val line_item_id: String,
+        val label: String,
+        val anomaly_type: String,
+        val severity: String,
+        val score: java.math.BigDecimal,
+        val message: String,
+    )
+
+    data class AnomalyDetectionResponse(
+        val anomalies: List<AnomalyDto>,
+        val overall_risk_score: java.math.BigDecimal,
+        val summary: String,
+        val total_items_checked: Int,
+        val flagged_count: Int,
+    )
+
+    fun detectAnomalies(request: AnomalyDetectionRequest): AnomalyDetectionResponse =
+        executeWithResilience("ml") {
+            mlClient.post().uri("ml/anomaly/detect")
+                .bodyValue(request)
+                .retrieve().bodyToMono(AnomalyDetectionResponse::class.java)
+                .withMlResilience("ml.detectAnomalies")
                 .block()!!
         }
 

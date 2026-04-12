@@ -8,4 +8,5 @@ data class AuthMeResponse(
     val tenantId: String,
     val tenantName: String,
     val lastLoginAt: String?,
+    val mfaEnabled: Boolean = false,
 )

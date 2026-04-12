@@ -4,17 +4,15 @@ import com.numera.covenant.domain.CovenantMonitoringItem
 import com.numera.covenant.domain.CovenantStatus
 import com.numera.covenant.domain.CovenantThresholdOperator
 import com.numera.covenant.domain.CovenantType
-import com.numera.covenant.events.CovenantBreachedEvent
-import com.numera.covenant.events.CovenantStatusChangedEvent
 import com.numera.covenant.infrastructure.CovenantCustomerRepository
 import com.numera.covenant.infrastructure.CovenantMonitoringRepository
 import com.numera.covenant.infrastructure.CovenantRepository
 import com.numera.model.application.FormulaEngine
-import com.numera.spreading.events.SpreadSubmittedEvent
-import com.numera.spreading.infrastructure.SpreadItemRepository
-import com.numera.spreading.infrastructure.SpreadValueRepository
+import com.numera.shared.events.CovenantBreachedEvent
+import com.numera.shared.events.CovenantStatusChangedEvent
+import com.numera.shared.events.SpreadSubmittedEvent
+import com.numera.shared.infrastructure.DomainEventPublisher
 import org.slf4j.LoggerFactory
-import org.springframework.context.ApplicationEventPublisher
 import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Component
@@ -23,13 +21,12 @@ import java.math.BigDecimal
 
 @Component
 class SpreadCovenantEventListener(
-    private val spreadItemRepository: SpreadItemRepository,
-    private val spreadValueRepository: SpreadValueRepository,
     private val covenantCustomerRepository: CovenantCustomerRepository,
     private val covenantRepository: CovenantRepository,
     private val monitoringRepository: CovenantMonitoringRepository,
     private val formulaEngine: FormulaEngine,
-    private val eventPublisher: ApplicationEventPublisher,
+    private val eventPublisher: DomainEventPublisher,
+    private val intelligenceService: CovenantIntelligenceService,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -39,14 +36,9 @@ class SpreadCovenantEventListener(
     fun onSpreadSubmitted(event: SpreadSubmittedEvent) {
         log.info("Spread submitted: spreadItemId={}, tenantId={}", event.spreadItemId, event.tenantId)
 
-        val spreadItem = spreadItemRepository.findById(event.spreadItemId).orElse(null) ?: run {
-            log.warn("SpreadItem {} not found, skipping covenant recalculation", event.spreadItemId)
-            return
-        }
-
         val covenantCustomer = covenantCustomerRepository
-            .findByTenantIdAndCustomerId(event.tenantId, spreadItem.customer.id!!) ?: run {
-            log.debug("No covenant customer linked to customer {} in tenant {}", spreadItem.customer.id, event.tenantId)
+            .findByTenantIdAndCustomerId(event.tenantId, event.customerId) ?: run {
+            log.debug("No covenant customer linked to customer {} in tenant {}", event.customerId, event.tenantId)
             return
         }
 
@@ -59,9 +51,8 @@ class SpreadCovenantEventListener(
             return
         }
 
-        // Build values map: itemCode → mappedValue
-        val spreadValues = spreadValueRepository.findBySpreadItemId(event.spreadItemId)
-        val valuesMap: Map<String, BigDecimal?> = spreadValues.associate { it.itemCode to it.mappedValue }
+        // Value snapshot is embedded in the event payload to avoid cross-module repo coupling.
+        val valuesMap: Map<String, BigDecimal?> = event.spreadValues
 
         log.info("Processing {} covenants with {} spread values", financialCovenants.size, valuesMap.size)
 
@@ -72,7 +63,7 @@ class SpreadCovenantEventListener(
                 // Find DUE/SUBMITTED monitoring items for the period matching the spread's statement date
                 val monitoringItems = monitoringRepository.findByCovenantId(covenant.id!!)
                     .filter { it.status.name in listOf("DUE", "SUBMITTED", "OVERDUE") }
-                    .filter { !spreadItem.statementDate.isBefore(it.periodStart) && !spreadItem.statementDate.isAfter(it.periodEnd) }
+                    .filter { !event.statementDate.isBefore(it.periodStart) && !event.statementDate.isAfter(it.periodEnd) }
 
                 for (item in monitoringItems) {
                     item.calculatedValue = calculatedValue
@@ -91,6 +82,13 @@ class SpreadCovenantEventListener(
                 log.error("Failed to evaluate covenant {}: {}", covenant.name, e.message)
             }
         }
+
+        // Trigger intelligence recomputation (breach probabilities + heatmap refresh)
+        try {
+            intelligenceService.recomputeForSpread(event.spreadItemId, event.tenantId)
+        } catch (e: Exception) {
+            log.error("Failed to recompute covenant intelligence for spread {}: {}", event.spreadItemId, e.message)
+        }
     }
 
     private fun transitionStatus(item: CovenantMonitoringItem, newStatus: CovenantStatus, tenantId: java.util.UUID) {
@@ -98,7 +96,7 @@ class SpreadCovenantEventListener(
         item.status = newStatus
         monitoringRepository.save(item)
 
-        eventPublisher.publishEvent(
+        eventPublisher.publish(
             CovenantStatusChangedEvent(
                 tenantId = tenantId,
                 monitoringItemId = item.id!!,
@@ -110,7 +108,7 @@ class SpreadCovenantEventListener(
         )
 
         if (newStatus == CovenantStatus.BREACHED) {
-            eventPublisher.publishEvent(
+            eventPublisher.publish(
                 CovenantBreachedEvent(
                     tenantId = tenantId,
                     covenantId = item.covenant.id!!,

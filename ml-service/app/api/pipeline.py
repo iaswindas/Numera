@@ -44,6 +44,7 @@ async def process_document(
     request: PipelineRequest,
     http_request: Request,
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
 ):
     """Process a document through the full ML pipeline.
 
@@ -238,9 +239,16 @@ async def process_document(
                 # Build source rows from tables + zones
                 source_rows = _build_source_rows(tables, zones)
 
-                # For pipeline demo, use empty target items
-                # In production, these come from the model template via backend
                 target_items: list[TargetLineItem] = []
+                auth_token = request.auth_token or authorization
+
+                if request.template_id:
+                    target_items = await _load_target_items(
+                        client=client,
+                        template_id=request.template_id,
+                        backend_url=settings.backend_url,
+                        auth_token=auth_token,
+                    )
 
                 if source_rows and target_items:
                     mappings, model_version = matcher.match(source_rows, target_items)
@@ -330,3 +338,79 @@ def _build_source_rows(
                 ))
 
     return rows
+
+
+async def _load_target_items(
+    client: httpx.AsyncClient,
+    template_id: str,
+    backend_url: str,
+    auth_token: str | None,
+) -> list[TargetLineItem]:
+    headers: dict[str, str] = {}
+    if auth_token:
+        headers["Authorization"] = auth_token if auth_token.lower().startswith("bearer ") else f"Bearer {auth_token}"
+
+    response = await client.get(
+        f"{backend_url.rstrip('/')}/api/model-templates/{template_id}",
+        headers=headers,
+    )
+    response.raise_for_status()
+
+    payload = response.json()
+    line_items = payload.get("lineItems", [])
+    target_items: list[TargetLineItem] = []
+
+    for item in line_items:
+        target_items.append(
+            TargetLineItem(
+                line_item_id=str(item.get("itemCode") or item.get("id") or ""),
+                label=str(item.get("label") or ""),
+                parent_label=item.get("category"),
+                zone_type=_parse_zone_type(item.get("zone")),
+                item_type=_parse_item_type(item.get("itemType")),
+            )
+        )
+
+    return target_items
+
+
+def _parse_item_type(raw: object) -> str:
+    value = str(raw or "INPUT").upper()
+    if value in {"INPUT", "FORMULA", "VALIDATION", "CATEGORY"}:
+        return value
+    return "INPUT"
+
+
+def _parse_zone_type(raw: object) -> ZoneType:
+    value = str(raw or "OTHER").upper()
+
+    if value == ZoneType.BALANCE_SHEET.value:
+        return ZoneType.BALANCE_SHEET
+    if value == ZoneType.INCOME_STATEMENT.value:
+        return ZoneType.INCOME_STATEMENT
+    if value == ZoneType.CASH_FLOW.value:
+        return ZoneType.CASH_FLOW
+    if value == ZoneType.NOTES_FIXED_ASSETS.value:
+        return ZoneType.NOTES_FIXED_ASSETS
+    if value == ZoneType.NOTES_RECEIVABLES.value:
+        return ZoneType.NOTES_RECEIVABLES
+    if value == ZoneType.NOTES_DEBT.value:
+        return ZoneType.NOTES_DEBT
+    if value in {ZoneType.NOTES_OTHER.value, "NOTES", "NOTE"}:
+        return ZoneType.NOTES_OTHER
+
+    if "BALANCE" in value:
+        return ZoneType.BALANCE_SHEET
+    if "INCOME" in value or value == "IS":
+        return ZoneType.INCOME_STATEMENT
+    if "CASH" in value or value == "CF":
+        return ZoneType.CASH_FLOW
+    if "FIXED" in value and "NOTE" in value:
+        return ZoneType.NOTES_FIXED_ASSETS
+    if "RECEIVABLE" in value and "NOTE" in value:
+        return ZoneType.NOTES_RECEIVABLES
+    if "DEBT" in value and "NOTE" in value:
+        return ZoneType.NOTES_DEBT
+    if "NOTE" in value:
+        return ZoneType.NOTES_OTHER
+    return ZoneType.OTHER

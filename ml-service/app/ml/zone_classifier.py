@@ -3,8 +3,16 @@
 import logging
 import random
 
-import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+try:
+    import torch
+except Exception:  # pragma: no cover - optional dependency in lightweight envs
+    torch = None
+
+try:
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+except Exception:  # pragma: no cover - optional dependency in lightweight envs
+    AutoModelForSequenceClassification = None
+    AutoTokenizer = None
 
 from app.api.models import ZoneType
 from app.services.model_manager import ModelManager
@@ -140,6 +148,10 @@ class LayoutLMZoneClassifier:
 
     def _load_model(self, model_manager, settings, stage="Production"):
         """Load a LayoutLM model from MLflow or HuggingFace."""
+        if torch is None or AutoTokenizer is None or AutoModelForSequenceClassification is None:
+            logger.info("Torch/Transformers unavailable; falling back to keyword heuristic classifier")
+            return
+
         try:
             model_path = model_manager.load_model("layoutlm-zone-classifier", stage=stage)
             self.tokenizer = AutoTokenizer.from_pretrained(str(model_path))
@@ -166,6 +178,9 @@ class LayoutLMZoneClassifier:
 
     def _load_staging(self, model_manager, settings):
         """Load Staging model for A/B testing."""
+        if torch is None or AutoTokenizer is None or AutoModelForSequenceClassification is None:
+            return
+
         try:
             staging_path = model_manager.load_staging_model("layoutlm-zone-classifier")
             if staging_path:

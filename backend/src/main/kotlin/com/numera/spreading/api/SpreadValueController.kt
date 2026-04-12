@@ -5,7 +5,9 @@ import com.numera.spreading.dto.BulkAcceptRequest
 import com.numera.spreading.dto.BulkAcceptResponse
 import com.numera.spreading.dto.SpreadValueResponse
 import com.numera.spreading.dto.SpreadValueUpdateRequest
+import com.numera.shared.notification.WebSocketNotificationService
 import jakarta.validation.Valid
+import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -19,6 +21,7 @@ import java.util.UUID
 @RequestMapping("/api/spread-items/{id}/values")
 class SpreadValueController(
     private val spreadService: SpreadService,
+    private val wsNotificationService: WebSocketNotificationService,
 ) {
     @GetMapping
     fun list(@PathVariable id: UUID): List<SpreadValueResponse> = spreadService.values(id)
@@ -28,7 +31,25 @@ class SpreadValueController(
         @PathVariable id: UUID,
         @PathVariable valueId: UUID,
         @Valid @RequestBody request: SpreadValueUpdateRequest,
-    ): SpreadValueResponse = spreadService.updateValue(id, valueId, request)
+    ): SpreadValueResponse {
+        val updated = spreadService.updateValue(id, valueId, request)
+        val changedBy = SecurityContextHolder.getContext().authentication?.name ?: "anonymous"
+        wsNotificationService.notifySpreadValueChanged(id, changedBy, updated.itemCode)
+        return updated
+    }
+
+    @PutMapping("/{valueId}/notes")
+    fun updateNotes(
+        @PathVariable id: UUID,
+        @PathVariable valueId: UUID,
+        @Valid @RequestBody request: Map<String, String>,
+    ): SpreadValueResponse {
+        val notes = request["notes"] ?: ""
+        val updated = spreadService.updateNotes(id, valueId, notes)
+        val changedBy = SecurityContextHolder.getContext().authentication?.name ?: "anonymous"
+        wsNotificationService.notifySpreadValueChanged(id, changedBy, updated.itemCode)
+        return updated
+    }
 
     @PostMapping("/bulk-accept")
     fun bulkAccept(@PathVariable id: UUID, @Valid @RequestBody request: BulkAcceptRequest): BulkAcceptResponse =

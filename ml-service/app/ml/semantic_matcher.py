@@ -11,7 +11,22 @@ import random
 import re
 
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
+
+try:
+    from sklearn.metrics.pairwise import cosine_similarity
+except Exception:  # pragma: no cover - optional dependency in lightweight envs
+    def cosine_similarity(a: np.ndarray, b: np.ndarray) -> np.ndarray:  # type: ignore[no-redef]
+        a_arr = np.asarray(a, dtype=np.float32)
+        b_arr = np.asarray(b, dtype=np.float32)
+
+        a_norm = np.linalg.norm(a_arr, axis=1, keepdims=True)
+        b_norm = np.linalg.norm(b_arr, axis=1, keepdims=True)
+        a_norm[a_norm == 0] = 1.0
+        b_norm[b_norm == 0] = 1.0
+
+        a_unit = a_arr / a_norm
+        b_unit = b_arr / b_norm
+        return np.matmul(a_unit, b_unit.T)
 
 from app.api.models import (
     ConfidenceLevel,

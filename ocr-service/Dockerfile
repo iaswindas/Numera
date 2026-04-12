@@ -1,18 +1,22 @@
 FROM python:3.11-slim AS base
 
-WORKDIR /app
-
 # System deps for PyMuPDF / image processing
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 libglib2.0-0 && \
     rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -g 1001 app && useradd -u 1001 -g app -m app
+
+WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ ./app/
 
-RUN mkdir -p /app/models
+RUN mkdir -p /app/models && chown -R app:app /app
+
+USER app
 
 EXPOSE 8001
 

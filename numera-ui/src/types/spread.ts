@@ -18,6 +18,9 @@ export interface SpreadValue {
   confidenceLevel: string | null
   sourcePage: number | null
   sourceText: string | null
+  sourceDocumentName?: string | null
+  sourceBbox?: string | null
+  notes?: string | null
   isManualOverride: boolean
   isAutofilled: boolean
   isFormulaCell: boolean
@@ -87,4 +90,31 @@ export interface DocumentZone {
   confidence: number
   rowCount: number
   mappedCount: number
+}
+
+export interface SpreadVarianceDto {
+  lineItemId: string
+  lineItemCode: string
+  lineItemLabel?: string
+  currentValue: number | null
+  compareValue: number | null
+  absoluteChange: number | null
+  percentageChange: number | null
+}
+
+export interface Zone {
+  id: string
+  type: 'is' | 'bs' | 'cf' | 'notes' | 'other'
+  pageNumber: number
+  boundingBox: BoundingBox
+  confidence: number
+}
+
+export interface ZoneData {
+  zone: Zone
+  pageNumber: number
+}
+
+export interface SpreadValueWithNotes extends SpreadValue {
+  notes: string | null
 }

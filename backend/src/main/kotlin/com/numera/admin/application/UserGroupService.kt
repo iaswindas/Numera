@@ -7,6 +7,7 @@ import com.numera.admin.infrastructure.GroupCustomerAccessRepository
 import com.numera.admin.infrastructure.GroupMemberRepository
 import com.numera.admin.infrastructure.UserGroupRepository
 import com.numera.shared.domain.TenantAwareEntity
+import com.numera.shared.security.TenantContext
 import com.numera.shared.exception.ApiException
 import com.numera.shared.exception.ErrorCode
 import org.springframework.stereotype.Service
@@ -19,10 +20,11 @@ class UserGroupService(
     private val memberRepository: GroupMemberRepository,
     private val accessRepository: GroupCustomerAccessRepository,
 ) {
-    private val tenantId = TenantAwareEntity.DEFAULT_TENANT
+    private fun resolvedTenantId(): java.util.UUID =
+        TenantContext.get()?.let { java.util.UUID.fromString(it) } ?: TenantAwareEntity.DEFAULT_TENANT
 
     fun listGroups(): List<Map<String, Any?>> =
-        groupRepository.findByTenantIdAndIsActiveTrue(tenantId).map { it.toMap() }
+        groupRepository.findByTenantIdAndIsActiveTrue(resolvedTenantId()).map { it.toMap() }
 
     fun getGroup(id: UUID): Map<String, Any?> {
         val group = groupRepository.findById(id)
@@ -38,7 +40,7 @@ class UserGroupService(
     @Transactional
     fun createGroup(name: String, description: String?, createdBy: UUID?): Map<String, Any?> {
         val saved = groupRepository.save(UserGroup().also {
-            it.tenantId = tenantId
+            it.tenantId = resolvedTenantId()
             it.name = name
             it.description = description
             it.createdBy = createdBy

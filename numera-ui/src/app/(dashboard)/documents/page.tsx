@@ -1,21 +1,33 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Play, Search, Trash2, Upload } from 'lucide-react'
 import { useDeleteDocument, useDocuments, useProcessDocument, useUploadDocument } from '@/services/documentApi'
 import { useCustomers } from '@/services/customerApi'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { useAuthStore } from '@/stores/authStore'
+import { useWebSocketSubscription } from '@/hooks/useWebSocket'
+
+type FileStoreTab = 'MINE' | 'ALL' | 'ERROR'
 
 export default function DocumentsPage() {
   const { showToast } = useToast()
+  const queryClient = useQueryClient()
+  const tenantId = useAuthStore((s) => s.user?.tenantId)
   const [query, setQuery] = useState('')
   const [customerId, setCustomerId] = useState('')
   const [language, setLanguage] = useState('en')
+  const [activeTab, setActiveTab] = useState<FileStoreTab>('MINE')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  const docsQuery = useDocuments()
+  const docsQuery = useDocuments({
+    customerId: customerId || undefined,
+    uploadedBy: activeTab === 'MINE' ? 'MINE' : undefined,
+    status: activeTab === 'ERROR' ? 'ERROR' : undefined,
+  })
   const customersQuery = useCustomers({ query })
   const uploadMutation = useUploadDocument()
   const processMutation = useProcessDocument()
@@ -23,6 +35,10 @@ export default function DocumentsPage() {
 
   const documents = docsQuery.data ?? []
   const customers = customersQuery.data ?? []
+
+  useWebSocketSubscription(tenantId ? `/topic/tenant/${tenantId}/documents` : null, () => {
+    void queryClient.invalidateQueries({ queryKey: ['documents'] })
+  })
 
   const filtered = documents.filter((d) => d.filename.toLowerCase().includes(query.toLowerCase()))
 
@@ -83,6 +99,30 @@ export default function DocumentsPage() {
             onChange={(e) => onFileSelected(e.target.files?.[0])}
           />
         </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <button
+          className={`btn ${activeTab === 'MINE' ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={() => setActiveTab('MINE')}
+          type="button"
+        >
+          My Files
+        </button>
+        <button
+          className={`btn ${activeTab === 'ALL' ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={() => setActiveTab('ALL')}
+          type="button"
+        >
+          All Files
+        </button>
+        <button
+          className={`btn ${activeTab === 'ERROR' ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={() => setActiveTab('ERROR')}
+          type="button"
+        >
+          Error Files
+        </button>
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>

@@ -43,7 +43,7 @@ async function tryRefresh(refreshToken: string): Promise<boolean> {
     }
     localStorage.setItem('numera-auth', JSON.stringify(parsed))
     if (typeof document !== 'undefined') {
-      document.cookie = `numera-auth=${body.accessToken}; path=/; max-age=86400; SameSite=Lax`
+      document.cookie = `numera-auth=${body.accessToken}; path=/; max-age=86400; SameSite=Lax; Secure`
     }
     return true
   } catch {

@@ -83,6 +83,6 @@ class SpreadLockService(
         val value = redis.opsForValue().get(key) ?: return false
         val parts = value.split("|")
         if (parts[0] != userEmail) return false
-        return redis.expire(key, LOCK_TTL)
+        return redis.expire(key, LOCK_TTL) ?: false
     }
 }

@@ -3,7 +3,8 @@
         allowedDependencies = {
                 "shared::audit",
                 "shared::domain",
-                "shared::exception"
+                "shared::exception",
+                "shared::security"
         }
 )
 package com.numera.model;

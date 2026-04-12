@@ -1,11 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, CheckCheck, Clock, Lock, RotateCcw, Send, Shield, Sparkles, Unlock } from 'lucide-react'
+import { ArrowLeft, CheckCheck, Clock, Copy, Lock, RotateCcw, Send, Shield, Sparkles, Unlock } from 'lucide-react'
 import {
   useAcceptAll,
   useAcquireLock,
+  useAutofillFromBase,
+  useBasePeriod,
   useLockHeartbeat,
   useProcessSpread,
   useReleaseLock,
@@ -14,6 +17,7 @@ import {
   useSpreadItem,
   useSpreadLock,
   useSpreadValues,
+  useSpreadVariance,
   useSubmitSpread,
   useUpdateSpreadValue,
 } from '@/services/spreadApi'
@@ -21,15 +25,39 @@ import { useToast } from '@/components/ui/Toast'
 import { PdfViewer } from '@/components/spreading/PdfViewer'
 import { SpreadTable } from '@/components/spreading/SpreadTable'
 import { ValidationPanel } from '@/components/spreading/ValidationPanel'
+import { LockBanner } from '@/components/spreading/LockBanner'
+import { CategoryNav } from '@/components/spreading/CategoryNav'
+import { ExpressionEditor } from '@/components/spreading/ExpressionEditor'
 import { useSpreadStore } from '@/stores/spreadStore'
-import type { SpreadValue, MappingResult } from '@/types/spread'
+import { useWebSocketSubscription } from '@/hooks/useWebSocket'
+import type { SpreadValue, MappingResult, BoundingBox, Zone } from '@/types/spread'
 
 type RightPanel = 'values' | 'history' | 'validation'
+
+const zoneToCategory: Record<Zone['type'], string> = {
+  bs: 'Balance Sheet',
+  is: 'Income Statement',
+  cf: 'Cash Flow',
+  notes: 'Notes',
+  other: 'All',
+}
+
+function asBoundingBox(value: unknown): BoundingBox | null {
+  if (!value || typeof value !== 'object') return null
+  const box = value as Record<string, unknown>
+  const x = Number(box.x)
+  const y = Number(box.y)
+  const width = Number(box.width)
+  const height = Number(box.height)
+  if ([x, y, width, height].some((n) => Number.isNaN(n))) return null
+  return { x, y, width, height }
+}
 
 export default function SpreadingWorkspacePage() {
   const router = useRouter()
   const params = useParams<{ spreadId: string }>()
   const spreadId = params.spreadId
+  const queryClient = useQueryClient()
   const { showToast } = useToast()
 
   // ── Queries ──────────────────────────────────────────────────────────
@@ -48,14 +76,24 @@ export default function SpreadingWorkspacePage() {
   const releaseLockMutation = useReleaseLock()
   const heartbeatMutation = useLockHeartbeat()
 
+  // ── Subsequent Spreading ─────────────────────────────────────────────
+  const basePeriodQuery = useBasePeriod(spreadId)
+  const autofillMutation = useAutofillFromBase(spreadId)
+  const basePeriodId = basePeriodQuery.data?.basePeriodId ?? null
+
   // ── Store ────────────────────────────────────────────────────────────
-  const { highlightedSourcePage, selectCell, highlightSource, clearHighlight, selectedCellCode } = useSpreadStore()
+  const { highlightedSourcePage, selectCell, highlightSource, selectedCellCode } = useSpreadStore()
 
   // ── Local state ──────────────────────────────────────────────────────
   const [draftComments, setDraftComments] = useState('')
   const [rightPanel, setRightPanel] = useState<RightPanel>('values')
   const [validationResult, setValidationResult] = useState<MappingResult | null>(null)
   const [pdfPage, setPdfPage] = useState<number>(1)
+  const [showVariance, setShowVariance] = useState(false)
+  const [showOnlyMapped, setShowOnlyMapped] = useState(false)
+  const [activeCategory, setActiveCategory] = useState<string>('All')
+  const [isExpressionEditorOpen, setIsExpressionEditorOpen] = useState(false)
+  const [editingValue, setEditingValue] = useState<SpreadValue | null>(null)
 
   const values = valuesQuery.data ?? []
   const history = historyQuery.data?.versions ?? []
@@ -63,6 +101,32 @@ export default function SpreadingWorkspacePage() {
   const lockInfo = lockQuery.data
   const isLockedByOther = lockInfo?.locked === true && lockInfo.lockedBy !== undefined
   const isLockedByMe = lockInfo?.locked === true // simplified check
+
+  // ── Variance Query ─────────────────────────────────────────────────────
+  const compareSpreadId = basePeriodId
+  const varianceQuery = useSpreadVariance(spreadId, compareSpreadId ?? '')
+  const varianceData = varianceQuery.data ?? []
+
+  useWebSocketSubscription(spreadId ? `/topic/spread/${spreadId}/lock` : null, () => {
+    void queryClient.invalidateQueries({ queryKey: ['spread', spreadId, 'lock'] })
+  })
+
+  useWebSocketSubscription(spreadId ? `/topic/spread/${spreadId}/values` : null, () => {
+    void queryClient.invalidateQueries({ queryKey: ['spread', spreadId, 'values'] })
+    void queryClient.invalidateQueries({ queryKey: ['spread', spreadId] })
+  })
+
+  // ── Categories ─────────────────────────────────────────────────────────
+  const categories = useMemo(() => {
+    const cats = new Set(['All'])
+    values.forEach((v) => {
+      if (v.label) {
+        const category = v.label.split('|')[0]?.trim()
+        if (category) cats.add(category)
+      }
+    })
+    return Array.from(cats).sort()
+  }, [values])
 
   // ── Lock heartbeat ───────────────────────────────────────────────────
   useEffect(() => {
@@ -84,12 +148,18 @@ export default function SpreadingWorkspacePage() {
     (value: SpreadValue) => {
       selectCell(value.itemCode)
       if (value.sourcePage) {
-        highlightSource(value.sourcePage, { x: 0, y: 0, width: 0, height: 0 })
+        const expressionSource = asBoundingBox(value.expressionDetail?.['sourceBoundingBox'])
+        highlightSource(value.sourcePage, expressionSource ?? { x: 24, y: 24, width: 260, height: 34 })
         setPdfPage(value.sourcePage)
       }
     },
     [selectCell, highlightSource]
   )
+
+  const handleCellDoubleClick = useCallback((value: SpreadValue) => {
+    setEditingValue(value)
+    setIsExpressionEditorOpen(true)
+  }, [])
 
   const handleValueEdit = useCallback(
     async (valueId: string, newValue: number | undefined) => {
@@ -102,6 +172,22 @@ export default function SpreadingWorkspacePage() {
       showToast('Value updated', 'success')
     },
     [updateValueMutation, showToast]
+  )
+
+  const handleExpressionSave = useCallback(
+    async (expression: string, computedValue: number) => {
+      if (!editingValue) return
+
+      await updateValueMutation.mutateAsync({
+        valueId: editingValue.id,
+        mappedValue: computedValue,
+        overrideComment: `Formula: ${expression}`,
+        expressionType: 'FORMULA',
+      })
+
+      showToast('Formula saved', 'success')
+    },
+    [editingValue, updateValueMutation, showToast]
   )
 
   const handleProcess = useCallback(async () => {
@@ -121,6 +207,12 @@ export default function SpreadingWorkspacePage() {
     }
   }, [isLockedByMe, spreadId, acquireLockMutation, releaseLockMutation, showToast])
 
+  const handleAutofill = useCallback(async () => {
+    if (!basePeriodId) return
+    const result = await autofillMutation.mutateAsync(basePeriodId)
+    showToast(`Autofilled ${result.filledCount} values from prior period`, 'success')
+  }, [basePeriodId, autofillMutation, showToast])
+
   if (spreadQuery.isLoading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-muted)' }}>
@@ -131,6 +223,9 @@ export default function SpreadingWorkspacePage() {
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* ── Lock Banner ────────────────────────────────────────────── */}
+      <LockBanner lockedBy={isLockedByOther ? lockInfo?.lockedByName ?? lockInfo?.lockedBy ?? null : null} />
+
       {/* ── Top Toolbar ────────────────────────────────────────────── */}
       <div
         style={{
@@ -189,6 +284,12 @@ export default function SpreadingWorkspacePage() {
           <CheckCheck size={14} />
           Accept High
         </button>
+        {basePeriodId && (
+          <button className="btn btn-ghost btn-sm" onClick={handleAutofill} disabled={autofillMutation.isPending}>
+            <Copy size={14} />
+            {autofillMutation.isPending ? 'Autofilling...' : 'Autofill from Prior'}
+          </button>
+        )}
         <button
           className="btn btn-primary btn-sm"
           onClick={() => {
@@ -217,6 +318,9 @@ export default function SpreadingWorkspacePage() {
         <span style={{ color: '#ff9f0a' }}>Medium: {confidenceSummary.medium}</span>
         <span style={{ color: '#ff453a' }}>Low: {confidenceSummary.low}</span>
         <span>Total: {confidenceSummary.total}</span>
+        {basePeriodId && (
+          <span style={{ color: 'var(--color-accent)' }}>Prior period available</span>
+        )}
       </div>
 
       {/* ── Dual-Pane Content ──────────────────────────────────────── */}
@@ -233,7 +337,11 @@ export default function SpreadingWorkspacePage() {
           {spread?.documentId ? (
             <PdfViewer
               documentId={spread.documentId}
+              documentUrl={`/api/documents/${spread.documentId}/download`}
               currentPage={highlightedSourcePage ?? pdfPage}
+              pageNumber={highlightedSourcePage ?? pdfPage}
+              scale={1}
+              onZoneNavigate={(zoneType) => setActiveCategory(zoneToCategory[zoneType] ?? 'All')}
               onPageChange={setPdfPage}
             />
           ) : (
@@ -293,13 +401,62 @@ export default function SpreadingWorkspacePage() {
           {/* Panel content */}
           <div style={{ flex: 1, overflow: 'auto' }}>
             {rightPanel === 'values' && (
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                {/* Controls bar */}
+                <div
+                  style={{
+                    padding: '10px 12px',
+                    borderBottom: '1px solid var(--border-subtle)',
+                    background: 'var(--bg-secondary)',
+                    display: 'flex',
+                    gap: 12,
+                    alignItems: 'center',
+                    fontSize: 12,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showOnlyMapped}
+                      onChange={(e) => setShowOnlyMapped(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span>{showOnlyMapped ? 'Showing Mapped Only' : 'Showing All Rows'}</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showVariance}
+                      onChange={(e) => setShowVariance(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span>Show Variance</span>
+                  </label>
+                </div>
+
+                {/* Category nav */}
+                <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)' }}>
+                  <CategoryNav
+                    categories={categories}
+                    activeCategory={activeCategory}
+                    onCategoryClick={setActiveCategory}
+                  />
+                </div>
+
               <SpreadTable
                 values={values}
                 isLocked={isLockedByOther}
                 onCellClick={handleCellClick}
+                onCellDoubleClick={handleCellDoubleClick}
                 onValueEdit={handleValueEdit}
                 selectedCellCode={selectedCellCode}
+                showVariance={showVariance}
+                varianceData={varianceData}
+                showOnlyMapped={showOnlyMapped}
+                spreadId={spreadId}
               />
+              </div>
             )}
 
             {rightPanel === 'validation' && (
@@ -368,6 +525,17 @@ export default function SpreadingWorkspacePage() {
           </div>
         </div>
       </div>
+
+      <ExpressionEditor
+        open={isExpressionEditorOpen}
+        targetValue={editingValue}
+        allValues={values}
+        onClose={() => {
+          setIsExpressionEditorOpen(false)
+          setEditingValue(null)
+        }}
+        onSave={handleExpressionSave}
+      />
     </div>
   )
 }

@@ -25,7 +25,8 @@ class MinioStorageClient(
         val bucket = config.storage.bucket
         ensureBucket(bucket)
 
-        val objectName = "${UUID.randomUUID()}-${file.originalFilename}"
+        val safeName = sanitizeFilename(file.originalFilename ?: "document")
+        val objectName = "${UUID.randomUUID()}-$safeName"
         client.putObject(
             PutObjectArgs.builder()
                 .bucket(bucket)
@@ -35,6 +36,20 @@ class MinioStorageClient(
                 .build()
         )
         return "$bucket/$objectName"
+    }
+
+    /**
+     * Sanitize a user-provided filename to prevent path-traversal and injection attacks.
+     * Strips directory separators, null bytes, and shell metacharacters.
+     */
+    private fun sanitizeFilename(name: String): String {
+        // Take only the filename portion (strip any directory path)
+        val basename = name.substringAfterLast('/').substringAfterLast('\\')
+        // Remove null bytes, control characters, and shell metacharacters
+        val cleaned = basename.replace(Regex("[\\x00-\\x1f\\x7f;|&`\$!#]"), "")
+            .replace("..", "_")  // Prevent directory traversal
+            .trim()
+        return cleaned.ifBlank { "document" }
     }
 
     fun download(storagePath: String): InputStream {

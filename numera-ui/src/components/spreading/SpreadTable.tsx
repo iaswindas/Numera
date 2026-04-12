@@ -2,15 +2,26 @@
 
 import { useMemo, useRef, useCallback } from 'react'
 import { AgGridReact } from 'ag-grid-react'
-import type { ColDef, CellClassParams, CellClickedEvent } from 'ag-grid-community'
-import type { SpreadValue } from '@/types/spread'
+import type { ColDef, CellClassParams, CellClickedEvent, CellDoubleClickedEvent } from 'ag-grid-community'
+import type { SpreadValue, SpreadVarianceDto } from '@/types/spread'
+import { NoteEditor } from './NoteEditor'
+import { useUpdateSpreadValueNotes } from '@/services/spreadApi'
 
 interface SpreadTableProps {
   values: SpreadValue[]
   isLocked: boolean
   onCellClick?: (value: SpreadValue) => void
+  onCellDoubleClick?: (value: SpreadValue) => void
   onValueEdit?: (valueId: string, newValue: number | undefined) => void
   selectedCellCode: string | null
+  showVariance?: boolean
+  varianceData?: SpreadVarianceDto[]
+  showOnlyMapped?: boolean
+  spreadId: string
+}
+
+interface SpreadTableRow extends SpreadValue {
+  notes?: string | null
 }
 
 const confidenceColor = (level: string | null) => {
@@ -26,8 +37,30 @@ const confidenceColor = (level: string | null) => {
   }
 }
 
-export function SpreadTable({ values, isLocked, onCellClick, onValueEdit, selectedCellCode }: SpreadTableProps) {
+export function SpreadTable({
+  values,
+  isLocked,
+  onCellClick,
+  onCellDoubleClick,
+  onValueEdit,
+  selectedCellCode,
+  showVariance = false,
+  varianceData = [],
+  showOnlyMapped = false,
+  spreadId,
+}: SpreadTableProps) {
   const gridRef = useRef<AgGridReact>(null)
+  const updateNotesMutation = useUpdateSpreadValueNotes(spreadId)
+
+  const varianceMap = useMemo(
+    () => Object.fromEntries(varianceData.map((v) => [v.lineItemCode, v])),
+    [varianceData]
+  )
+
+  const filteredValues = useMemo(() => {
+    if (!showOnlyMapped) return values
+    return values.filter((v) => v.mappedValue != null)
+  }, [values, showOnlyMapped])
 
   const columnDefs = useMemo<ColDef[]>(
     () => [
@@ -36,13 +69,31 @@ export function SpreadTable({ values, isLocked, onCellClick, onValueEdit, select
         field: 'itemCode',
         width: 140,
         pinned: 'left',
-        cellStyle: { fontFamily: 'var(--font-mono)', fontSize: 12 },
+        cellStyle: () => ({ fontFamily: 'var(--font-mono)', fontSize: 12 }),
       },
       {
         headerName: 'Label',
         field: 'label',
         flex: 1,
         minWidth: 180,
+      },
+      {
+        headerName: 'Notes',
+        field: 'id',
+        width: 60,
+        cellRenderer: (params: { data: SpreadTableRow }) => {
+          return (
+            <NoteEditor
+              valueId={params.data.id}
+              initialNotes={params.data.notes ?? ''}
+              onSave={async (notes) => {
+                await updateNotesMutation.mutateAsync({ valueId: params.data.id, notes })
+              }}
+            />
+          )
+        },
+        sortable: false,
+        resizable: false,
       },
       {
         headerName: 'Mapped Value',
@@ -54,12 +105,73 @@ export function SpreadTable({ values, isLocked, onCellClick, onValueEdit, select
           if (p.value == null) return '-'
           return Number(p.value).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
         },
-        cellStyle: (params: CellClassParams) => ({
-          ...confidenceColor(params.data?.confidenceLevel),
-          fontWeight: params.data?.isFormulaCell ? 600 : 400,
-          fontStyle: params.data?.isManualOverride ? 'italic' : 'normal',
-        }),
+        cellStyle: (params: CellClassParams) => {
+          const confidenceStyle = confidenceColor(params.data?.confidenceLevel)
+          const style: Record<string, string | number> = {
+            fontWeight: params.data?.isFormulaCell ? 600 : 400,
+            fontStyle: params.data?.isManualOverride ? 'italic' : 'normal',
+          }
+          if (typeof confidenceStyle.background === 'string') {
+            style.background = confidenceStyle.background
+          }
+          return style
+        },
       },
+      ...(showVariance
+        ? [
+            {
+              headerName: 'Change ($)',
+              width: 110,
+              valueGetter: (params: { data: SpreadValue }) => varianceMap[params.data?.itemCode]?.absoluteChange ?? null,
+              valueFormatter: (p: { value: number | null }) => {
+                if (p.value == null) return '-'
+                const formatted = Number(p.value).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+                return p.value >= 0 ? `+${formatted}` : formatted
+              },
+              cellStyle: (params: CellClassParams) => {
+                const variance = varianceMap[(params.data as SpreadValue | undefined)?.itemCode ?? '']
+                const style: Record<string, string | number> = {
+                  background: 'transparent',
+                  color: 'inherit',
+                }
+                if (!variance?.percentageChange) return style
+                const pctChange = Math.abs(variance.percentageChange)
+                if (pctChange > 25) style.background = 'rgba(255, 69, 58, 0.12)'
+                if (pctChange > 10 && pctChange <= 25) style.background = 'rgba(255, 159, 10, 0.12)'
+                return style
+              },
+            },
+            {
+              headerName: 'Change (%)',
+              width: 100,
+              valueGetter: (params: { data: SpreadValue }) => varianceMap[params.data?.itemCode]?.percentageChange ?? null,
+              valueFormatter: (p: { value: number | null }) => {
+                if (p.value == null) return '-'
+                return `${Number(p.value).toFixed(1)}%`
+              },
+              cellStyle: (params: CellClassParams) => {
+                const variance = varianceMap[(params.data as SpreadValue | undefined)?.itemCode ?? '']
+                const style: Record<string, string | number> = {
+                  background: 'transparent',
+                  color: 'inherit',
+                  fontWeight: 400,
+                }
+                if (!variance?.percentageChange) return style
+                const pctChange = Math.abs(variance.percentageChange)
+                if (pctChange > 25) {
+                  style.background = 'rgba(255, 69, 58, 0.12)'
+                  style.fontWeight = 600
+                  style.color = '#ff453a'
+                } else if (pctChange > 10) {
+                  style.background = 'rgba(255, 159, 10, 0.12)'
+                  style.fontWeight = 600
+                  style.color = '#ff9f0a'
+                }
+                return style
+              },
+            },
+          ]
+        : []),
       {
         headerName: 'Confidence',
         field: 'confidenceLevel',
@@ -90,10 +202,10 @@ export function SpreadTable({ values, isLocked, onCellClick, onValueEdit, select
           if (params.data?.isAutofilled) return 'Auto'
           return 'ML'
         },
-        cellStyle: { fontSize: 11 },
+        cellStyle: () => ({ fontFamily: 'inherit', fontSize: 11 }),
       },
     ],
-    [isLocked]
+    [isLocked, showVariance, varianceMap, updateNotesMutation]
   )
 
   const onCellClicked = useCallback(
@@ -102,6 +214,15 @@ export function SpreadTable({ values, isLocked, onCellClick, onValueEdit, select
       onCellClick(event.data as SpreadValue)
     },
     [onCellClick]
+  )
+
+  const onCellDoubleClicked = useCallback(
+    (event: CellDoubleClickedEvent) => {
+      if (!onCellDoubleClick || !event.data) return
+      if (event.colDef.field !== 'mappedValue') return
+      onCellDoubleClick(event.data as SpreadValue)
+    },
+    [onCellDoubleClick]
   )
 
   const onCellValueChanged = useCallback(
@@ -127,11 +248,12 @@ export function SpreadTable({ values, isLocked, onCellClick, onValueEdit, select
     <div className="ag-theme-alpine-dark" style={{ width: '100%', height: '100%' }}>
       <AgGridReact
         ref={gridRef}
-        rowData={values}
+        rowData={filteredValues}
         columnDefs={columnDefs}
         getRowId={(params) => params.data.id}
         animateRows
         onCellClicked={onCellClicked}
+        onCellDoubleClicked={onCellDoubleClicked}
         onCellValueChanged={onCellValueChanged}
         getRowStyle={getRowStyle}
         headerHeight={32}

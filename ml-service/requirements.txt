@@ -13,11 +13,16 @@ tokenizers==0.21.*
 # Utilities
 numpy==2.2.*
 scikit-learn==1.6.*
+scipy==1.14.*
 httpx==0.28.*
 python-multipart==0.0.*
 orjson==3.10.*
 boto3==1.37.*
 mlflow-skinny==2.18.*
+ortools==9.11.*
+
+# Phase 1: RS-BSN Covenant Predictor (optional; pure-NumPy fallback if absent)
+hmmlearn>=0.3.0
 
 # Phase 1: PostgreSQL (feedback persistence)
 asyncpg==0.30.*

@@ -46,12 +46,12 @@ def pdf_corrupt(message: str) -> MLError:
     )
 
 
-def pdf_password_protected() -> MLError:
+def pdf_password_protected(detail: str | None = None) -> MLError:
     return MLError(
         error_code="PDF_PASSWORD_PROTECTED",
         message="PDF is password-protected",
         recoverable=False,
-        detail="Provide password or upload an unprotected version",
+        detail=detail or "Provide password or upload an unprotected version",
     )
 
 

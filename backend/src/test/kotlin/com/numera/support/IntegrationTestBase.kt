@@ -30,6 +30,7 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.time.LocalDate
+import java.time.Instant
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -52,7 +53,7 @@ abstract class IntegrationTestBase {
             """
             TRUNCATE TABLE refresh_tokens, user_roles, role_permissions, spread_versions, spread_values,
             expression_patterns, spread_items, detected_zones, documents, model_validations,
-            model_line_items, model_templates, event_log, customers, users, roles RESTART IDENTITY CASCADE
+            model_line_items, model_templates, event_log, customers, users, roles, password_policies RESTART IDENTITY CASCADE
             """
         )
         jdbcTemplate.update(
@@ -82,6 +83,8 @@ abstract class IntegrationTestBase {
             it.tenantId = TenantAwareEntity.DEFAULT_TENANT
             it.email = email
             it.passwordHash = passwordEncoder.encode(password)
+            it.passwordChangedAt = Instant.now()
+            it.passwordHistory = "[]"
             it.fullName = fullName
             it.enabled = true
             it.roles.add(role)

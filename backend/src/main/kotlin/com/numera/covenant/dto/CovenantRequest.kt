@@ -18,4 +18,9 @@ data class CovenantRequest(
     // Non-financial fields
     val documentType: String? = null,
     val itemType: String? = null,
+    // Audit & Compliance
+    val auditMethod: String? = null,
+    // Reminder Configuration
+    val reminderDaysBefore: Int = 7,
+    val reminderDaysAfter: Int = 3,
 )

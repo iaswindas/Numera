@@ -2,9 +2,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchApi } from './api'
 import type { Document, DocumentProcessingStatus, DocumentUploadResponse, ZonesResponse } from '@/types/document'
 
-export function useDocuments(params?: { customerId?: string }) {
+export function useDocuments(params?: { customerId?: string; uploadedBy?: string; status?: string }) {
   const query = new URLSearchParams()
   if (params?.customerId) query.set('customerId', params.customerId)
+  if (params?.uploadedBy) query.set('uploadedBy', params.uploadedBy)
+  if (params?.status) query.set('status', params.status)
 
   return useQuery<Document[]>({
     queryKey: ['documents', params],

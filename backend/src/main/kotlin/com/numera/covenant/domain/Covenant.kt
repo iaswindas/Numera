@@ -61,7 +61,21 @@ class Covenant : TenantAwareEntity() {
     /** Free-form item type label */
     @Column
     var itemType: String? = null
+    // ── Audit & Compliance ────────────────────────────────────────────
 
+    /** AUDITED, MANAGEMENT, or BANK_STATEMENT */
+    @Column
+    var auditMethod: String? = null
+
+    // ── Reminder Configuration ─────────────────────────────────────────
+
+    /** Days before due date to send reminder email */
+    @Column(nullable = false)
+    var reminderDaysBefore: Int = 7
+
+    /** Days after due date to send overdue escalation email */
+    @Column(nullable = false)
+    var reminderDaysAfter: Int = 3
     // ── Common ────────────────────────────────────────────────────────────
 
     @Column(nullable = false)

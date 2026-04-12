@@ -65,4 +65,13 @@ class SpreadValue : BaseEntity() {
 
     @Column(columnDefinition = "text")
     var overrideComment: String? = null
+
+    @Column
+    var sourceDocumentName: String? = null
+
+    @Column(columnDefinition = "text")
+    var sourceBbox: String? = null
+
+    @Column(columnDefinition = "text")
+    var notes: String? = null
 }

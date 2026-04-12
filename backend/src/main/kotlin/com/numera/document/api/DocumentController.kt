@@ -1,6 +1,7 @@
 package com.numera.document.api
 
 import com.numera.document.application.DocumentProcessingService
+import com.numera.document.domain.DocumentStatus
 import com.numera.document.dto.DocumentResponse
 import com.numera.document.dto.DocumentStatusResponse
 import com.numera.document.dto.DocumentUploadResponse
@@ -32,8 +33,11 @@ class DocumentController(
     private val documentProcessingService: DocumentProcessingService,
 ) {
     @GetMapping("/documents")
-    fun list(@RequestParam(required = false) customerId: UUID?): List<DocumentResponse> =
-        documentProcessingService.list(customerId)
+    fun list(
+        @RequestParam(required = false) customerId: UUID?,
+        @RequestParam(required = false) uploadedBy: String?,
+        @RequestParam(required = false) status: DocumentStatus?,
+    ): List<DocumentResponse> = documentProcessingService.list(customerId, uploadedBy, status)
 
     @PostMapping("/documents/upload")
     @ResponseStatus(HttpStatus.ACCEPTED)
@@ -41,8 +45,14 @@ class DocumentController(
         @RequestPart("file") file: MultipartFile,
         @RequestPart("customerId") customerId: String,
         @RequestPart(value = "language", required = false) language: String?,
+        @RequestPart(value = "password", required = false) password: String?,
     ): DocumentUploadResponse =
-        documentProcessingService.upload(customerId = UUID.fromString(customerId), file = file, language = language ?: "en")
+        documentProcessingService.upload(
+            customerId = UUID.fromString(customerId),
+            file = file,
+            language = language ?: "en",
+            password = password,
+        )
 
     @PostMapping("/customers/{customerId}/documents/upload")
     @ResponseStatus(HttpStatus.ACCEPTED)
@@ -50,10 +60,14 @@ class DocumentController(
         @PathVariable customerId: UUID,
         @RequestPart("file") file: MultipartFile,
         @RequestPart(value = "language", required = false) language: String?,
-    ): DocumentUploadResponse = documentProcessingService.upload(customerId, file, language ?: "en")
+        @RequestPart(value = "password", required = false) password: String?,
+    ): DocumentUploadResponse = documentProcessingService.upload(customerId, file, language ?: "en", password)
 
     @PostMapping("/documents/{id}/process")
-    fun process(@PathVariable id: UUID): DocumentStatusResponse = documentProcessingService.process(id)
+    fun process(
+        @PathVariable id: UUID,
+        @RequestParam(value = "password", required = false) password: String?,
+    ): DocumentStatusResponse = documentProcessingService.process(id, password)
 
     @GetMapping("/documents/{id}")
     fun get(@PathVariable id: UUID): DocumentResponse = documentProcessingService.getDocument(id)

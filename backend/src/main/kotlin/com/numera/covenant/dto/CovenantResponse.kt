@@ -19,6 +19,9 @@ data class CovenantResponse(
     val thresholdMax: BigDecimal?,
     val documentType: String?,
     val itemType: String?,
+    val auditMethod: String?,
+    val reminderDaysBefore: Int,
+    val reminderDaysAfter: Int,
     val isActive: Boolean,
     val createdAt: Instant,
 )

@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import java.time.LocalDate
+import java.util.UUID
 
 @Entity
 @Table(name = "spread_items")
@@ -49,4 +50,18 @@ class SpreadItem : TenantAwareEntity() {
 
     @Column(nullable = false)
     var currentVersion: Int = 0
+
+    @ManyToOne
+    @JoinColumn(name = "base_spread_id")
+    var baseSpread: SpreadItem? = null
+
+    @Column(name = "period_sequence")
+    var periodSequence: Int = 0
+
+    @Column(nullable = false)
+    var restatementNumber: Int = 0
+
+    @ManyToOne
+    @JoinColumn(name = "original_spread_id")
+    var originalSpread: SpreadItem? = null
 }

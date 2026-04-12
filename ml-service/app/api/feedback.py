@@ -17,9 +17,19 @@ from app.api.models import (
     FeedbackResponse,
     FeedbackStatsResponse,
 )
+from app.services.feedback_store import FeedbackStore
 
 router = APIRouter()
 logger = logging.getLogger("ml-service.api.feedback")
+
+
+async def _get_feedback_store(http_request: Request) -> FeedbackStore:
+    store = getattr(http_request.app.state, "feedback_store", None)
+    if store is None:
+        store = FeedbackStore()
+        await store.init(None)
+        http_request.app.state.feedback_store = store
+    return store
 
 
 @router.post("/feedback", response_model=FeedbackResponse)
@@ -29,7 +39,7 @@ async def submit_feedback(request: FeedbackRequest, http_request: Request):
     Corrections are stored in PostgreSQL (or in-memory if PG unavailable)
     and used for periodic model retraining via Colab notebooks.
     """
-    store = http_request.app.state.feedback_store
+    store = await _get_feedback_store(http_request)
 
     corrections = [
         {
@@ -77,7 +87,7 @@ async def export_feedback(
     This endpoint is called by `20_feedback_retraining.ipynb` to download
     accumulated corrections for model fine-tuning.
     """
-    store = http_request.app.state.feedback_store
+    store = await _get_feedback_store(http_request)
 
     since_dt = None
     if since:
@@ -116,6 +126,6 @@ async def feedback_stats(
     tenant_id: Optional[str] = Query(None),
 ):
     """Return feedback statistics."""
-    store = http_request.app.state.feedback_store
+    store = await _get_feedback_store(http_request)
     stats = await store.get_stats(tenant_id=tenant_id)
     return FeedbackStatsResponse(**stats)

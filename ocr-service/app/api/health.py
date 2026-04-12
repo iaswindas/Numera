@@ -27,6 +27,10 @@ def health_check(request: Request):
                 "loaded": getattr(app.state, "table_loaded", False),
                 "version": "3.0",
             },
+            "stgh": {
+                "loaded": getattr(app.state, "stgh_loaded", False),
+                "version": "1.0",
+            },
         },
         "device": "gpu" if getattr(app.state, "ocr_engine", None)
                   and getattr(app.state.ocr_engine, "use_gpu", False) else "cpu",

@@ -3,9 +3,9 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Upload, Search, FileSpreadsheet, Shield, BarChart3,
-  Users, BookOpen, Settings, Workflow, Mail, Calculator, Activity,
+  Users, BookOpen, Settings, Workflow, Mail, Calculator, Activity, Languages,
 } from 'lucide-react'
-
+import { CheckCheck } from 'lucide-react'
 const nav = [
   {
     section: 'Main',
@@ -18,6 +18,12 @@ const nav = [
     items: [
       { href: '/customers', icon: Search, label: 'Search Customer' },
       { href: '/documents', icon: Upload, label: 'File Store' },
+    ],
+  },
+  {
+    section: 'Approvals',
+    items: [
+      { href: '/approvals', icon: CheckCheck, label: 'Pending Approvals' },
     ],
   },
   {
@@ -40,6 +46,7 @@ const nav = [
     section: 'Admin',
     items: [
       { href: '/admin/users', icon: Users, label: 'User Management' },
+      { href: '/admin/languages', icon: Languages, label: 'Languages' },
       { href: '/admin/taxonomy', icon: BookOpen, label: 'Taxonomy & Zones' },
       { href: '/admin/workflows', icon: Workflow, label: 'Workflow Designer' },
     ],

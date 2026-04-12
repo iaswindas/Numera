@@ -1,5 +1,7 @@
 FROM python:3.11-slim AS base
 
+RUN groupadd -g 1001 app && useradd -u 1001 -g app -m app
+
 WORKDIR /app
 
 # Install Python deps (cached layer)
@@ -10,7 +12,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ ./app/
 
 # Create model cache directory
-RUN mkdir -p /app/models
+RUN mkdir -p /app/models && chown -R app:app /app
+
+USER app
 
 EXPOSE 8002
 

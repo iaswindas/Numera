@@ -14,8 +14,11 @@ This is the core intelligence that distinguishes Numera from simple OCR.
 import logging
 import re
 from dataclasses import dataclass, field
+from decimal import Decimal
 from enum import Enum
 from typing import Optional
+
+from app.config import settings
 
 logger = logging.getLogger("ml-service.ml.expression_engine")
 
@@ -89,6 +92,23 @@ class ExpressionEngine:
                        0.01 = 1% difference allowed (for rounding).
         """
         self.tolerance = tolerance
+        self._milp_solver = None
+
+        if settings.enable_ng_milp:
+            from app.ml.ng_milp import NGMILPConfig, NGMILPSolver
+
+            self._milp_solver = NGMILPSolver(
+                NGMILPConfig(
+                    tolerance=settings.ng_milp_tolerance,
+                    solver_timeout_ms=settings.ng_milp_timeout_ms,
+                    use_ortools=settings.ng_milp_use_ortools,
+                    gnn_weights_path=settings.ng_milp_gnn_weights,
+                    max_candidates_per_cell=settings.ng_milp_max_candidates_per_cell,
+                    candidate_row_window=settings.ng_milp_candidate_row_window,
+                    max_addends=settings.ng_milp_max_addends,
+                )
+            )
+            self.tolerance = settings.ng_milp_tolerance
 
     def build_expressions(
         self,
@@ -109,6 +129,7 @@ class ExpressionEngine:
             List of MappingExpression for each mappable item.
         """
         expressions = []
+        milp_expressions = self._discover_sum_expressions(extracted_rows, period_index)
 
         # Index extracted rows by their semantic match
         row_to_item = {}
@@ -148,6 +169,17 @@ class ExpressionEngine:
 
             # Get value for this period
             value = self._get_value(best_row, period_index)
+
+            if best_row_idx in milp_expressions:
+                expressions.append(
+                    self._build_ng_milp_expression(
+                        target_id=item_id,
+                        target_label=item_label,
+                        expression=milp_expressions[best_row_idx],
+                        confidence=best_conf,
+                    )
+                )
+                continue
 
             # Check if this row is a total with children
             children = parent_children.get(best_row_idx, [])
@@ -344,6 +376,73 @@ class ExpressionEngine:
             target_label, children_sum, total_value, f"{diff_ratio*100:.1f}",
         )
         return None
+
+    def _discover_sum_expressions(
+        self,
+        extracted_rows: list[ExtractedRow],
+        period_index: int,
+    ) -> dict[int, object]:
+        if self._milp_solver is None:
+            return {}
+
+        from app.ml.ng_milp import CellValue
+
+        cells: list[CellValue] = []
+        for row in extracted_rows:
+            value = self._get_value(row, period_index)
+            if value is None:
+                continue
+
+            cells.append(
+                CellValue(
+                    row=row.index,
+                    col=period_index,
+                    value=Decimal(str(value)),
+                    label=row.label,
+                    indent_level=row.indent_level,
+                    is_total=row.is_total,
+                    page=row.page,
+                )
+            )
+
+        try:
+            return {
+                expression.sum_cell.row: expression
+                for expression in self._milp_solver.solve(cells)
+            }
+        except Exception:
+            logger.exception("NG-MILP solve failed; falling back to heuristic expression engine")
+            return {}
+
+    def _build_ng_milp_expression(
+        self,
+        target_id: str,
+        target_label: str,
+        expression,
+        confidence: float,
+    ) -> MappingExpression:
+        sources = [
+            SourceRef(
+                row_index=cell.row,
+                label=cell.label,
+                value=float(cell.value),
+                page=cell.page,
+                confidence=max(confidence * 0.95, expression.confidence),
+            )
+            for cell in expression.addends
+        ]
+        source_labels = " + ".join(source.label for source in sources)
+        solver_confidence = max(confidence * 0.9, expression.confidence)
+
+        return MappingExpression(
+            target_item_id=target_id,
+            target_label=target_label,
+            expression_type=ExpressionType.SUM,
+            sources=sources,
+            computed_value=float(expression.computed_value),
+            confidence=round(min(solver_confidence, 0.99), 4),
+            explanation=f"{target_label} = {source_labels}",
+        )
 
     @staticmethod
     def _get_value(row: ExtractedRow, period_index: int = 0) -> float | None:

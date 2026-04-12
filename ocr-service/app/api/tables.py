@@ -5,6 +5,7 @@ import time
 import uuid
 
 from fastapi import APIRouter, Request
+from fastapi import HTTPException
 from pydantic import BaseModel
 
 from app.api.errors import storage_error, table_detection_failure, pdf_corrupt, pdf_password_protected, MLError
@@ -49,35 +50,27 @@ async def detect_tables(request: TableDetectRequest, http_request: Request):
     errors: list[MLError] = []
 
     # Download
-    storage = http_request.app.state.storage
+    storage = getattr(http_request.app.state, "storage", None)
+    if storage is None:
+        raise HTTPException(status_code=502, detail="Storage subsystem unavailable")
     try:
         pdf_bytes = storage.download(request.storage_path)
     except FileNotFoundError:
-        return TableDetectResponse(
-            document_id=request.document_id,
-            total_pages=0, tables_detected=0, tables_filtered=0,
-            tables=[], processing_time_ms=int((time.time() - start) * 1000),
-            errors=[storage_error(f"File not found: {request.storage_path}")],
-        )
+        raise HTTPException(status_code=404, detail=f"File not found: {request.storage_path}")
     except Exception as exc:
-        return TableDetectResponse(
-            document_id=request.document_id,
-            total_pages=0, tables_detected=0, tables_filtered=0,
-            tables=[], processing_time_ms=int((time.time() - start) * 1000),
-            errors=[storage_error(str(exc))],
-        )
+        raise HTTPException(status_code=502, detail=f"Storage error: {exc}")
 
     # ─── Smart routing ───
     from app.utils.pdf_utils import has_embedded_text, extract_native_tables, pdf_to_images, PdfPasswordError
 
     try:
         is_native = has_embedded_text(pdf_bytes, password=request.password)
-    except PdfPasswordError:
+    except PdfPasswordError as exc:
         return TableDetectResponse(
             document_id=request.document_id,
             total_pages=0, tables_detected=0, tables_filtered=0,
             tables=[], processing_time_ms=int((time.time() - start) * 1000),
-            errors=[pdf_password_protected()],
+            errors=[pdf_password_protected(detail=str(exc))],
         )
     all_tables: list[DetectedTable] = []
     tables_filtered = 0
@@ -110,12 +103,12 @@ async def detect_tables(request: TableDetectRequest, http_request: Request):
         # ─── SCANNED PDF: VLM or PP-Structure ───
         try:
             page_images = pdf_to_images(pdf_bytes, password=request.password)
-        except PdfPasswordError:
+        except PdfPasswordError as exc:
             return TableDetectResponse(
                 document_id=request.document_id,
                 total_pages=0, tables_detected=0, tables_filtered=0,
                 tables=[], processing_time_ms=int((time.time() - start) * 1000),
-                errors=[pdf_password_protected()],
+                errors=[pdf_password_protected(detail=str(exc))],
             )
         except Exception as exc:
             return TableDetectResponse(
@@ -156,7 +149,7 @@ async def detect_tables(request: TableDetectRequest, http_request: Request):
             if table_detector:
                 for page_num, img in page_images:
                     try:
-                        raw_tables = table_detector.detect(img, page_num)
+                        raw_tables = table_detector.detect_tables(img, page_num)
                         for raw in raw_tables:
                             if raw.rows < request.min_rows or raw.cols < request.min_cols:
                                 tables_filtered += 1

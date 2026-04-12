@@ -1,8 +1,10 @@
 'use client'
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Search, Shield, Eye, Edit, Loader2 } from 'lucide-react'
 import { useCovenantCustomers } from '@/services/covenantApi'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { fetchApi } from '@/services/api'
 
 interface CovenantCustomerItem {
   id: string
@@ -19,11 +21,41 @@ interface CovenantCustomerItem {
 
 export default function CovenantManagementPage() {
   const router = useRouter()
+  const qc = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
+  // Form state
+  const [formName, setFormName] = useState('')
+  const [formRimId, setFormRimId] = useState('')
+  const [formClEntityId, setFormClEntityId] = useState('')
+  const [formFyEnd, setFormFyEnd] = useState('')
+
   const customersQuery = useCovenantCustomers(searchQuery || undefined)
   const customers = (customersQuery.data ?? []) as CovenantCustomerItem[]
+
+  const createMutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) =>
+      fetchApi('/covenants/customers', { method: 'POST', body: JSON.stringify(payload) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['covenant', 'customers'] })
+      setShowCreate(false)
+      setFormName('')
+      setFormRimId('')
+      setFormClEntityId('')
+      setFormFyEnd('')
+    },
+  })
+
+  const handleCreate = useCallback(() => {
+    if (!formName.trim() || !formRimId.trim()) return
+    createMutation.mutate({
+      customerName: formName,
+      rimId: formRimId,
+      clEntityId: formClEntityId || null,
+      financialYearEnd: formFyEnd || null,
+    })
+  }, [formName, formRimId, formClEntityId, formFyEnd, createMutation])
 
   return (
     <>
@@ -126,10 +158,10 @@ export default function CovenantManagementPage() {
               Basic Information
             </div>
             <div className="grid-2" style={{ marginBottom: 16 }}>
-              <div className="input-group"><label>Customer Name *</label><input className="input" placeholder="Enter customer name" /></div>
-              <div className="input-group"><label>RIM ID *</label><input className="input" placeholder="RIM-XXXXX" /></div>
-              <div className="input-group"><label>CL Entity ID</label><input className="input" placeholder="ENT-XXXXX" /></div>
-              <div className="input-group"><label>Financial Year End *</label><input className="input" type="date" /></div>
+              <div className="input-group"><label>Customer Name *</label><input className="input" placeholder="Enter customer name" value={formName} onChange={e => setFormName(e.target.value)} /></div>
+              <div className="input-group"><label>RIM ID *</label><input className="input" placeholder="RIM-XXXXX" value={formRimId} onChange={e => setFormRimId(e.target.value)} /></div>
+              <div className="input-group"><label>CL Entity ID</label><input className="input" placeholder="ENT-XXXXX" value={formClEntityId} onChange={e => setFormClEntityId(e.target.value)} /></div>
+              <div className="input-group"><label>Financial Year End</label><input className="input" type="date" value={formFyEnd} onChange={e => setFormFyEnd(e.target.value)} /></div>
             </div>
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12, marginTop: 20 }}>
               Contacts
@@ -145,7 +177,13 @@ export default function CovenantManagementPage() {
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
               <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={() => setShowCreate(false)}>Create Customer</button>
+              <button
+                className="btn btn-primary"
+                disabled={!formName.trim() || !formRimId.trim() || createMutation.isPending}
+                onClick={handleCreate}
+              >
+                {createMutation.isPending ? <><Loader2 size={14} className="spin" /> Creating...</> : 'Create Customer'}
+              </button>
             </div>
           </div>
         </div>
