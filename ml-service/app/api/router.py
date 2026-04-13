@@ -13,6 +13,8 @@ from .covenant_prediction import router as covenant_prediction_router
 from .anomaly_detection import router as anomaly_detection_router
 from .rsbsn_prediction import router as rsbsn_prediction_router
 from .knowledge_graph import router as knowledge_graph_router
+from .federated import router as federated_router
+from .copilot import router as copilot_router
 
 router = APIRouter()
 
@@ -27,4 +29,6 @@ router.include_router(covenant_prediction_router, prefix="/ml", tags=["covenant"
 router.include_router(rsbsn_prediction_router, prefix="/ml", tags=["covenant-rsbsn"])
 router.include_router(anomaly_detection_router, prefix="/ml", tags=["anomaly"])
 router.include_router(knowledge_graph_router, prefix="/ml", tags=["knowledge-graph"])
+router.include_router(federated_router, prefix="/ml", tags=["federated"])
+router.include_router(copilot_router, prefix="/ml", tags=["copilot"])
 

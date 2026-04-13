@@ -2,7 +2,7 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Upload, Search, FileSpreadsheet, Shield, BarChart3,
   Users, BookOpen, Settings, Bell, ChevronRight, Workflow, Mail,
-  Calculator, Activity
+  Calculator, Activity, Layers, Globe, Cpu, Map
 } from 'lucide-react'
 
 const nav = [
@@ -27,6 +27,10 @@ const nav = [
     { to: '/admin/users', icon: Users, label: 'User Management' },
     { to: '/admin/taxonomy', icon: BookOpen, label: 'Taxonomy & Zones' },
     { to: '/admin/workflows', icon: Workflow, label: 'Workflow Designer' },
+    { to: '/admin/model-templates', icon: Layers, label: 'Model Templates' },
+    { to: '/admin/zones', icon: Map, label: 'Zone Management' },
+    { to: '/admin/ai-models', icon: Cpu, label: 'AI Models' },
+    { to: '/admin/languages', icon: Globe, label: 'Languages' },
   ]},
 ]
 
@@ -44,6 +48,10 @@ function getBreadcrumb(pathname: string) {
     '/admin/users': ['Admin', 'User Management'],
     '/admin/taxonomy': ['Admin', 'Taxonomy & Zones'],
     '/admin/workflows': ['Admin', 'Workflow Designer'],
+    '/admin/model-templates': ['Admin', 'Model Templates'],
+    '/admin/zones': ['Admin', 'Zone Management'],
+    '/admin/ai-models': ['Admin', 'AI Models'],
+    '/admin/languages': ['Admin', 'Languages'],
   }
   if (pathname.includes('/items')) return ['Spreading', 'Customer', 'Existing Items']
   return m[pathname] || ['Dashboard']

@@ -12,6 +12,13 @@ import com.numera.integration.domain.SyncStatus
 import com.numera.integration.spi.AdapterResponse
 import com.numera.integration.spi.CanonicalSpreadPayload
 import com.numera.integration.spi.ExternalAdapter
+import com.numera.customer.domain.Customer
+import com.numera.document.domain.Document
+import com.numera.model.domain.ModelTemplate
+import com.numera.spreading.domain.SpreadItem
+import com.numera.spreading.domain.SpreadValue
+import com.numera.spreading.infrastructure.SpreadItemRepository
+import com.numera.spreading.infrastructure.SpreadValueRepository
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -25,12 +32,15 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.util.Optional
 import java.util.UUID
+import java.time.Instant
 
 class IntegrationSyncServiceTest {
 
     private val externalSystemRepo: ExternalSystemRepository = mockk()
     private val syncRecordRepo: SyncRecordRepository = mockk()
     private val adapter: ExternalAdapter = mockk()
+    private val spreadItemRepository: SpreadItemRepository = mockk()
+    private val spreadValueRepository: SpreadValueRepository = mockk()
 
     private lateinit var service: IntegrationSyncService
 
@@ -50,7 +60,33 @@ class IntegrationSyncServiceTest {
     @BeforeEach
     fun setUp() {
         every { adapter.systemType() } returns ExternalSystemType.CREDITLENS
-        service = IntegrationSyncService(externalSystemRepo, syncRecordRepo, listOf(adapter))
+
+        // Mock SpreadItem and SpreadValue for buildCanonicalPayload
+        val mockCustomer = mockk<Customer>(relaxed = true).apply {
+            every { customerCode } returns "CUST-001"
+            every { name } returns "Test Customer"
+            every { id } returns UUID.randomUUID()
+        }
+        val mockDocument = mockk<Document>(relaxed = true).apply {
+            every { id } returns UUID.randomUUID()
+        }
+        val mockTemplate = mockk<ModelTemplate>(relaxed = true).apply {
+            every { name } returns "IFRS Template"
+        }
+        val mockSpreadItem = mockk<SpreadItem>(relaxed = true).apply {
+            every { customer } returns mockCustomer
+            every { document } returns mockDocument
+            every { template } returns mockTemplate
+            every { statementDate } returns java.time.LocalDate.of(2024, 12, 31)
+            every { frequency } returns "ANNUAL"
+            every { auditMethod } returns null
+            every { sourceCurrency } returns "USD"
+            every { consolidation } returns null
+        }
+        every { spreadItemRepository.findById(any()) } returns Optional.of(mockSpreadItem)
+        every { spreadValueRepository.findBySpreadItemId(any()) } returns emptyList()
+
+        service = IntegrationSyncService(externalSystemRepo, syncRecordRepo, listOf(adapter), spreadItemRepository, spreadValueRepository)
     }
 
     @Nested
@@ -93,7 +129,7 @@ class IntegrationSyncServiceTest {
         }
 
         @Test
-        fun `pushSpread marks FAILED when adapter returns failure`() {
+        fun `pushSpread marks RETRYING when adapter returns failure and retries remain`() {
             every { externalSystemRepo.findById(systemId) } returns Optional.of(system)
             every { syncRecordRepo.findByIdempotencyKey(any()) } returns null
             val savedSlot = slot<SyncRecord>()
@@ -103,12 +139,13 @@ class IntegrationSyncServiceTest {
 
             val result = service.pushSpread(tenantId, systemId, spreadItemId)
 
-            assertEquals(SyncStatus.FAILED, result.status)
+            assertEquals(SyncStatus.RETRYING, result.status)
             assertEquals("Internal Server Error", result.lastError)
+            assertNotNull(result.nextRetryAt)
         }
 
         @Test
-        fun `pushSpread marks FAILED on exception`() {
+        fun `pushSpread marks RETRYING on exception when retries remain`() {
             every { externalSystemRepo.findById(systemId) } returns Optional.of(system)
             every { syncRecordRepo.findByIdempotencyKey(any()) } returns null
             val savedSlot = slot<SyncRecord>()
@@ -117,8 +154,9 @@ class IntegrationSyncServiceTest {
 
             val result = service.pushSpread(tenantId, systemId, spreadItemId)
 
-            assertEquals(SyncStatus.FAILED, result.status)
+            assertEquals(SyncStatus.RETRYING, result.status)
             assertEquals("Connection refused", result.lastError)
+            assertNotNull(result.nextRetryAt)
         }
     }
 
@@ -134,13 +172,13 @@ class IntegrationSyncServiceTest {
                 entityType = "SPREAD"
                 entityId = spreadItemId
                 direction = SyncDirection.PUSH
-                status = SyncStatus.FAILED
+                status = SyncStatus.RETRYING
                 retryCount = 1
                 maxRetries = 3
                 idempotencyKey = UUID.randomUUID().toString()
             }
 
-            every { syncRecordRepo.findByStatusAndRetryCountLessThan(SyncStatus.FAILED, 3) } returns listOf(failedRecord)
+            every { syncRecordRepo.findByStatusAndNextRetryAtBefore(SyncStatus.RETRYING, any()) } returns listOf(failedRecord)
             every { externalSystemRepo.findById(systemId) } returns Optional.of(system)
             val savedSlot = slot<SyncRecord>()
             every { syncRecordRepo.save(capture(savedSlot)) } answers { savedSlot.captured }

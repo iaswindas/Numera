@@ -1,0 +1,200 @@
+groups:
+  # ─── API & Backend Alerts ──────────────────────────────────────
+  - name: numera-backend
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+          /
+          sum(rate(http_server_requests_seconds_count[5m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "High 5xx error rate ({{ $value | humanizePercentage }})"
+          description: "Backend error rate exceeds 5% over the last 5 minutes."
+
+      - alert: HighApiLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_server_requests_seconds_bucket[5m])) by (le)
+          ) > 2.0
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "P95 API latency above 2s ({{ $value }}s)"
+          description: "95th percentile API response time exceeds 2 seconds."
+
+      - alert: BackendDown
+        expr: up{job="numera-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: infra
+        annotations:
+          summary: "Backend service is down"
+          description: "Backend has been unreachable for more than 2 minutes."
+
+      - alert: HighHeapUsage
+        expr: |
+          jvm_memory_used_bytes{area="heap"}
+          /
+          jvm_memory_max_bytes{area="heap"}
+          > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "JVM heap usage above 85% ({{ $value | humanizePercentage }})"
+
+  # ─── ML Service Alerts ────────────────────────────────────────
+  - name: numera-ml-service
+    rules:
+      - alert: MLServiceDown
+        expr: up{job="numera-ml-service"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: ml
+        annotations:
+          summary: "ML service is down"
+
+      - alert: HighMLInferenceLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(numera_ml_inference_duration_seconds_bucket[5m])) by (le, model)
+          ) > 10.0
+        for: 5m
+        labels:
+          severity: warning
+          team: ml
+        annotations:
+          summary: "ML inference P95 latency above 10s (model={{ $labels.model }})"
+
+      - alert: LowMappingAccuracy
+        expr: numera_ml_mapping_accuracy < 0.85
+        for: 30m
+        labels:
+          severity: warning
+          team: ml
+        annotations:
+          summary: "ML mapping accuracy dropped below 85% ({{ $value }})"
+
+  # ─── OCR Service Alerts ───────────────────────────────────────
+  - name: numera-ocr-service
+    rules:
+      - alert: OCRServiceDown
+        expr: up{job="numera-ocr-service"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: ocr
+        annotations:
+          summary: "OCR service is down"
+
+      - alert: HighOCRProcessingTime
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(numera_ocr_processing_duration_seconds_bucket[5m])) by (le)
+          ) > 30.0
+        for: 5m
+        labels:
+          severity: warning
+          team: ocr
+        annotations:
+          summary: "OCR processing P95 above 30s"
+
+  # ─── Queue / Messaging Alerts ─────────────────────────────────
+  - name: numera-messaging
+    rules:
+      - alert: RabbitMQQueueDepthHigh
+        expr: rabbitmq_queue_messages > 1000
+        for: 10m
+        labels:
+          severity: warning
+          team: infra
+        annotations:
+          summary: "RabbitMQ queue depth above 1000 ({{ $labels.queue }})"
+
+      - alert: RabbitMQDown
+        expr: up{job="rabbitmq"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: infra
+        annotations:
+          summary: "RabbitMQ is down"
+
+  # ─── Infrastructure Alerts ────────────────────────────────────
+  - name: numera-infrastructure
+    rules:
+      - alert: PostgreSQLDown
+        expr: up{job="postgresql"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: infra
+        annotations:
+          summary: "PostgreSQL is down"
+
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"}
+          /
+          node_filesystem_size_bytes{mountpoint="/"})
+          < 0.10
+        for: 15m
+        labels:
+          severity: critical
+          team: infra
+        annotations:
+          summary: "Disk space below 10% on {{ $labels.instance }}"
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: infra
+        annotations:
+          summary: "Redis is down"
+
+      - alert: MinIODown
+        expr: up{job="minio"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          team: infra
+        annotations:
+          summary: "MinIO storage is down"
+
+  # ─── Covenant Monitoring Alerts ────────────────────────────────
+  - name: numera-covenants
+    rules:
+      - alert: HighBreachRate
+        expr: |
+          sum(rate(numera_covenant_breaches_total[1h]))
+          /
+          sum(rate(numera_covenant_checks_total[1h]))
+          > 0.10
+        for: 30m
+        labels:
+          severity: warning
+          team: business
+        annotations:
+          summary: "Covenant breach rate above 10% over last hour"
+
+      - alert: CovenantCheckStale
+        expr: |
+          time() - numera_covenant_last_check_timestamp > 86400
+        for: 1h
+        labels:
+          severity: warning
+          team: business
+        annotations:
+          summary: "No covenant checks performed in 24 hours"

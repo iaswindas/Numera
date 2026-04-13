@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import { useLanguages, useToggleLanguage } from '@/services/adminApi'
+import { useLanguages, useToggleLanguage, useCreateLanguage } from '@/services/adminApi'
 import { useToast } from '@/components/ui/Toast'
 
 export default function AdminLanguagesPage() {
@@ -12,6 +12,7 @@ export default function AdminLanguagesPage() {
 
   const languagesQuery = useLanguages()
   const toggleMutation = useToggleLanguage()
+  const createLanguage = useCreateLanguage()
 
   const languages = languagesQuery.data ?? []
 
@@ -57,7 +58,17 @@ export default function AdminLanguagesPage() {
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
           <button
             className="btn btn-primary"
-            onClick={() => showToast('Add language API is not available yet in this environment', 'info')}
+            onClick={async () => {
+              try {
+                await createLanguage.mutateAsync({ code: newLanguageCode.trim(), name: newLanguageName.trim() })
+                showToast('Language added successfully', 'success')
+                setNewLanguageName('')
+                setNewLanguageCode('')
+              } catch (error) {
+                const message = typeof error === 'object' && error && 'message' in error ? String((error as { message: string }).message) : 'Failed to add language'
+                showToast(message, 'error')
+              }
+            }}
             disabled={!newLanguageName.trim() || !newLanguageCode.trim()}
           >
             <Plus size={14} />

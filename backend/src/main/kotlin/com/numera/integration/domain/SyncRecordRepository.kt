@@ -1,6 +1,7 @@
 package com.numera.integration.domain
 
 import org.springframework.data.jpa.repository.JpaRepository
+import java.time.Instant
 import java.util.UUID
 
 interface SyncRecordRepository : JpaRepository<SyncRecord, UUID> {
@@ -8,6 +9,8 @@ interface SyncRecordRepository : JpaRepository<SyncRecord, UUID> {
     fun findByIdempotencyKey(idempotencyKey: String): SyncRecord?
 
     fun findByStatusAndRetryCountLessThan(status: SyncStatus, maxRetries: Int): List<SyncRecord>
+
+    fun findByStatusAndNextRetryAtBefore(status: SyncStatus, cutoff: Instant): List<SyncRecord>
 
     fun findByExternalSystemIdAndEntityIdAndDirection(
         externalSystemId: UUID,

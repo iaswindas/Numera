@@ -1,7 +1,9 @@
 package com.numera.auth.application
 
+import com.numera.shared.config.FeatureFlagService
 import com.numera.shared.exception.ApiException
 import com.numera.shared.exception.ErrorCode
+import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
 import java.time.Duration
@@ -10,7 +12,9 @@ import java.util.UUID
 @Service
 class SessionManagementService(
     private val redis: StringRedisTemplate,
+    private val featureFlagService: FeatureFlagService,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
     companion object {
         private const val SESSION_PREFIX = "numera:session:"
         private const val USER_SESSIONS_PREFIX = "numera:user_sessions:"
@@ -85,11 +89,12 @@ class SessionManagementService(
     }
 
     /**
-     * Get configurable timeout per tenant.
-     * Currently returns default 30 minutes; can be extended to read from SystemConfig.
+     * Get configurable timeout per tenant via feature flag service.
+     * Falls back to DEFAULT_TIMEOUT (30 minutes) when no tenant-specific override exists.
      */
     fun configurableTimeout(tenantId: UUID): Duration {
-        // TODO: Read from tenant-specific SystemConfig if available
-        return DEFAULT_TIMEOUT
+        val minutes = featureFlagService.getLong(tenantId, "session.timeout.minutes", 30L)
+        log.debug("Session timeout for tenant {}: {} minutes", tenantId, minutes)
+        return Duration.ofMinutes(minutes)
     }
 }

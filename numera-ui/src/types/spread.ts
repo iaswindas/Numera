@@ -24,6 +24,8 @@ export interface SpreadValue {
   isManualOverride: boolean
   isAutofilled: boolean
   isFormulaCell: boolean
+  currency?: string | null
+  smartFillSource?: string | null
 }
 
 export interface ModelLineItem {
@@ -117,4 +119,37 @@ export interface ZoneData {
 
 export interface SpreadValueWithNotes extends SpreadValue {
   notes: string | null
+}
+
+export interface SpreadComment {
+  id: string
+  spreadItemId: string
+  valueId: string | null
+  content: string
+  type: 'AUTO' | 'MANUAL'
+  sourceUrl: string | null
+  createdBy: string
+  createdAt: string
+}
+
+export interface HistoricalSpread {
+  id: string
+  customerId: string
+  statementDate: string
+  status: SpreadStatus
+  currentVersion: number
+  templateName: string | null
+}
+
+export interface PageOperationRequest {
+  type: 'MERGE' | 'ROTATE' | 'SPLIT' | 'CLEAN'
+  pageNumbers: number[]
+  rotationDegrees?: number
+  splitAtPage?: number
+}
+
+export interface PageOperationResult {
+  success: boolean
+  message: string
+  resultingPages: number
 }

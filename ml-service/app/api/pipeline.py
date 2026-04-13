@@ -249,6 +249,11 @@ async def process_document(
                         backend_url=settings.backend_url,
                         auth_token=auth_token,
                     )
+                else:
+                    logger.warning(
+                        "No template_id provided for doc=%s — mapping will produce zero results",
+                        request.document_id,
+                    )
 
                 if source_rows and target_items:
                     mappings, model_version = matcher.match(source_rows, target_items)
@@ -350,14 +355,21 @@ async def _load_target_items(
     if auth_token:
         headers["Authorization"] = auth_token if auth_token.lower().startswith("bearer ") else f"Bearer {auth_token}"
 
-    response = await client.get(
-        f"{backend_url.rstrip('/')}/api/model-templates/{template_id}",
-        headers=headers,
-    )
-    response.raise_for_status()
+    try:
+        response = await client.get(
+            f"{backend_url.rstrip('/')}/api/model-templates/{template_id}/items",
+            headers=headers,
+        )
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        logger.warning("Failed to fetch template items for %s: HTTP %d", template_id, exc.response.status_code)
+        return []
+    except Exception as exc:
+        logger.warning("Failed to fetch template items for %s: %s", template_id, exc)
+        return []
 
     payload = response.json()
-    line_items = payload.get("lineItems", [])
+    line_items = payload if isinstance(payload, list) else payload.get("items", payload.get("lineItems", []))
     target_items: list[TargetLineItem] = []
 
     for item in line_items:
@@ -371,6 +383,7 @@ async def _load_target_items(
             )
         )
 
+    logger.info("Loaded %d target items from template %s", len(target_items), template_id)
     return target_items
 
 

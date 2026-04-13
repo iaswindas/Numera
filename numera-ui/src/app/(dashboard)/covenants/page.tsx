@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Send } from 'lucide-react'
+import { Send, ExternalLink } from 'lucide-react'
 import { useCovenantCustomers, useCovenantDefinitions, useMonitoringItems, useWaiverRequest } from '@/services/covenantApi'
 import { useAuthStore } from '@/stores/authStore'
 import { useToast } from '@/components/ui/Toast'
 import { useWebSocketSubscription } from '@/hooks/useWebSocket'
+import Link from 'next/link'
 
 export default function CovenantItemsPage() {
   const { user } = useAuthStore()
@@ -110,16 +111,22 @@ export default function CovenantItemsPage() {
               <th>Period End</th>
               <th>Due Date</th>
               <th>Breach Probability</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {monitoring.map((item) => (
               <tr key={item.id}>
-                <td>{item.covenantName}</td>
+                <td><Link href={`/covenants/${item.id}`} style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}>{item.covenantName}</Link></td>
                 <td><span className={`badge-status ${item.status.toLowerCase()}`}><span className="dot" />{item.status}</span></td>
                 <td>{item.periodEnd}</td>
                 <td>{item.dueDate}</td>
                 <td>{item.breachProbability ?? '-'}</td>
+                <td>
+                  <Link href={`/covenants/${item.id}`} className="btn btn-ghost btn-sm" title="View Details">
+                    <ExternalLink size={14} />
+                  </Link>
+                </td>
               </tr>
             ))}
           </tbody>

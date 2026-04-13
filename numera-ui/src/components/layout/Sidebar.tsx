@@ -39,6 +39,7 @@ const nav = [
   {
     section: 'Analytics',
     items: [
+      { href: '/portfolio', icon: BarChart3, label: 'Portfolio Analytics' },
       { href: '/reports', icon: BarChart3, label: 'Reports & MIS' },
     ],
   },

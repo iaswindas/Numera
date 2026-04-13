@@ -12,6 +12,7 @@
                 "shared::events",
                 "shared::exception",
                 "shared::infrastructure",
+                "shared::pdf",
                 "shared::security"
         }
 )

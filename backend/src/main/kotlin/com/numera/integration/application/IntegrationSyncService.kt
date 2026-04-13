@@ -102,9 +102,9 @@ class IntegrationSyncService(
 
     @Transactional
     fun retryFailedSyncs(): Int {
-        val failedRecords = syncRecordRepo.findByStatusAndRetryCountLessThan(SyncStatus.FAILED, 3)
+        val retryableRecords = syncRecordRepo.findByStatusAndNextRetryAtBefore(SyncStatus.RETRYING, Instant.now())
         var retried = 0
-        for (record in failedRecords) {
+        for (record in retryableRecords) {
             try {
                 val system = externalSystemRepo.findById(record.externalSystemId).orElse(null) ?: continue
                 val adapter = adapterFor(system.type)
@@ -214,9 +214,13 @@ class IntegrationSyncService(
         record.lastError = message
         if (record.retryCount >= record.maxRetries) {
             record.status = SyncStatus.FAILED
+            record.nextRetryAt = null
             log.warn("Sync record {} moved to dead-letter (max retries exceeded): {}", record.id, message)
         } else {
-            record.status = SyncStatus.FAILED
+            record.status = SyncStatus.RETRYING
+            val backoffSeconds = (1L shl record.retryCount.coerceAtMost(6)) * 30L // 30s, 60s, 120s, ...
+            record.nextRetryAt = Instant.now().plusSeconds(backoffSeconds)
+            log.info("Sync record {} scheduled for retry #{} at {}: {}", record.id, record.retryCount + 1, record.nextRetryAt, message)
         }
     }
 

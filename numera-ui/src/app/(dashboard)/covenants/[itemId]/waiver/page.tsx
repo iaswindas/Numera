@@ -10,6 +10,7 @@ import {
   useSendWaiverLetter,
   useSignatures,
   useEmailTemplates,
+  useMonitoringItemContacts,
 } from '@/services/covenantApi'
 import { useToast } from '@/components/ui/Toast'
 
@@ -37,6 +38,7 @@ export default function WaiverLetterPage() {
 
   const signaturesQuery = useSignatures()
   const templatesQuery = useEmailTemplates()
+  const contactsQuery = useMonitoringItemContacts(itemId)
 
   const generateMutation = useGenerateWaiverLetter()
   const sendMutation = useSendWaiverLetter()
@@ -50,12 +52,16 @@ export default function WaiverLetterPage() {
   )
 
   const contacts = useMemo(
-    () => [
-      { id: `${itemId}-1`, name: 'Primary Contact', email: 'primary.contact@customer.com' },
-      { id: `${itemId}-2`, name: 'Finance Controller', email: 'finance.controller@customer.com' },
-      { id: `${itemId}-3`, name: 'Treasury Lead', email: 'treasury.lead@customer.com' },
-    ],
-    [itemId]
+    () => {
+      const apiContacts = contactsQuery.data as Array<{ id: string; name: string; email: string }> | undefined
+      if (apiContacts && apiContacts.length > 0) return apiContacts
+      // Fallback when API returns no contacts
+      return [
+        { id: `${itemId}-1`, name: 'Primary Contact', email: 'primary.contact@customer.com' },
+        { id: `${itemId}-2`, name: 'Finance Controller', email: 'finance.controller@customer.com' },
+      ]
+    },
+    [contactsQuery.data, itemId]
   )
 
   const onGeneratePreview = async (values: WaiverFormValues) => {
@@ -262,6 +268,8 @@ export default function WaiverLetterPage() {
             content={letterContent}
             onChange={setLetterContent}
             onPrint={onDownload}
+            onSendEmail={onSend}
+            onDownloadPdf={onDownload}
           />
 
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>

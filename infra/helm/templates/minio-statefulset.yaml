@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-minio
+  labels:
+    {{- include "numera.labels" (dict "name" "minio" "Release" .Release "Chart" .Chart "Values" .Values) | nindent 4 }}
+spec:
+  serviceName: {{ .Release.Name }}-minio
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "numera.selectorLabels" (dict "name" "minio" "Release" .Release) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "numera.selectorLabels" (dict "name" "minio" "Release" .Release) | nindent 8 }}
+    spec:
+      containers:
+        - name: minio
+          image: "{{ .Values.minio.image.repository }}:{{ .Values.minio.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          command: ["server", "/data", "--console-address", ":9001"]
+          ports:
+            - name: api
+              containerPort: 9000
+              protocol: TCP
+            - name: console
+              containerPort: 9001
+              protocol: TCP
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-secrets
+                  key: minio-access-key
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-secrets
+                  key: minio-secret-key
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: api
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: api
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.minio.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.global.storageClass }}
+        storageClassName: {{ .Values.global.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.minio.storage.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-minio
+  labels:
+    {{- include "numera.labels" (dict "name" "minio" "Release" .Release "Chart" .Chart "Values" .Values) | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.minio.service.apiPort }}
+      targetPort: api
+      protocol: TCP
+      name: api
+    - port: {{ .Values.minio.service.consolePort }}
+      targetPort: console
+      protocol: TCP
+      name: console
+  selector:
+    {{- include "numera.selectorLabels" (dict "name" "minio" "Release" .Release) | nindent 4 }}

@@ -27,6 +27,9 @@ data class TenantFeatureFlag(
     @Column(nullable = false)
     val enabled: Boolean = false,
 
+    @Column(name = "flag_value", length = 255)
+    val flagValue: String? = null,
+
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
 

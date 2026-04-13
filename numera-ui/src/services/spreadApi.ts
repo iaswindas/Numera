@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchApi } from './api'
-import type { MappingResult, SpreadItem, SpreadValue, SpreadVarianceDto, VersionHistoryResponse } from '@/types/spread'
+import type { MappingResult, SpreadItem, SpreadValue, SpreadVarianceDto, VersionHistoryResponse, SpreadComment, HistoricalSpread, PageOperationRequest, PageOperationResult } from '@/types/spread'
 
 interface PendingApprovalItem {
   id: string
@@ -256,6 +256,77 @@ export function useAutofillFromBase(spreadId: string) {
       fetchApi<{ filledCount: number; baseSpreadId: string }>(`/spread-items/${spreadId}/autofill`, {
         method: 'POST',
         body: JSON.stringify({ baseSpreadId }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['spread', spreadId] })
+      queryClient.invalidateQueries({ queryKey: ['spread', spreadId, 'values'] })
+    },
+  })
+}
+
+// ── Comments ──────────────────────────────────────────────────────────
+
+export function useSpreadComments(spreadId: string, valueId?: string | null) {
+  const queryParam = valueId ? `?valueId=${valueId}` : ''
+  return useQuery({
+    queryKey: ['spread', spreadId, 'comments', valueId ?? 'all'],
+    queryFn: () => fetchApi<SpreadComment[]>(`/spread-items/${spreadId}/comments${queryParam}`),
+    enabled: !!spreadId,
+  })
+}
+
+export function useAddSpreadComment(spreadId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ valueId, content }: { valueId?: string; content: string }) =>
+      fetchApi<SpreadComment>(`/spread-items/${spreadId}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({ valueId, content, type: 'MANUAL' }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['spread', spreadId, 'comments'] })
+    },
+  })
+}
+
+// ── Page Operations ───────────────────────────────────────────────────
+
+export function usePageOperation(documentId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (operation: PageOperationRequest) =>
+      fetchApi<PageOperationResult>(`/documents/${documentId}/pages/operations`, {
+        method: 'POST',
+        body: JSON.stringify(operation),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['document', documentId] })
+      queryClient.invalidateQueries({ queryKey: ['document', documentId, 'zones'] })
+    },
+  })
+}
+
+// ── Historical Spreads ────────────────────────────────────────────────
+
+export function useHistoricalSpreads(customerId: string, dateFrom?: string, dateTo?: string) {
+  const params = new URLSearchParams()
+  if (dateFrom) params.set('dateFrom', dateFrom)
+  if (dateTo) params.set('dateTo', dateTo)
+  const qs = params.toString()
+  return useQuery({
+    queryKey: ['spreads', 'customer', customerId, 'historical', dateFrom, dateTo],
+    queryFn: () => fetchApi<HistoricalSpread[]>(`/customers/${customerId}/spread-items${qs ? `?${qs}` : ''}`),
+    enabled: !!customerId,
+  })
+}
+
+export function useLoadHistoricalValues(spreadId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (historicalSpreadIds: string[]) =>
+      fetchApi<{ loadedColumns: number }>(`/spread-items/${spreadId}/load-historical`, {
+        method: 'POST',
+        body: JSON.stringify({ historicalSpreadIds }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['spread', spreadId] })

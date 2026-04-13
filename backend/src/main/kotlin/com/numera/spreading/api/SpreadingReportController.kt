@@ -3,6 +3,9 @@ package com.numera.spreading.api
 import com.numera.spreading.domain.SpreadStatus
 import com.numera.spreading.infrastructure.SpreadItemRepository
 import com.numera.spreading.infrastructure.SpreadValueRepository
+import com.numera.shared.security.TenantContext
+import com.numera.shared.domain.TenantAwareEntity
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -10,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import java.util.UUID
 
 @RestController
 @RequestMapping("/api/reports")
@@ -17,9 +21,15 @@ class SpreadingReportController(
     private val spreadItemRepository: SpreadItemRepository,
     private val spreadValueRepository: SpreadValueRepository,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
+
+    private fun resolvedTenantId(): UUID =
+        TenantContext.get()?.let { UUID.fromString(it) } ?: TenantAwareEntity.DEFAULT_TENANT
+
     @GetMapping("/spreading-summary")
     fun spreadingSummary(): Map<String, Any> {
-        val spreads = spreadItemRepository.findAll()
+        val tenantId = resolvedTenantId()
+        val spreads = spreadItemRepository.findByTenantId(tenantId)
         return mapOf(
             "total" to spreads.size,
             "byStatus" to spreads.groupingBy { it.status.name }.eachCount(),
@@ -40,8 +50,11 @@ class SpreadingReportController(
     fun export(
         @RequestParam(required = false) status: SpreadStatus?,
     ): ResponseEntity<String> {
-        val spreads = spreadItemRepository.findAll()
+        val tenantId = resolvedTenantId()
+        val spreads = spreadItemRepository.findByTenantId(tenantId)
             .filter { status == null || it.status == status }
+
+        log.info("Exporting spreading report: tenant={}, status={}, spreadCount={}", tenantId, status, spreads.size)
 
         val csv = buildString {
             appendLine(

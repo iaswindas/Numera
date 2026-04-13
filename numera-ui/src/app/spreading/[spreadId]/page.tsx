@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, CheckCheck, Clock, Copy, Lock, RotateCcw, Send, Shield, Sparkles, Unlock } from 'lucide-react'
+import { ArrowLeft, CheckCheck, Clock, Columns, Copy, Lock, MessageCircle, RotateCcw, Send, Shield, Sparkles, Unlock } from 'lucide-react'
 import {
   useAcceptAll,
   useAcquireLock,
@@ -28,11 +28,14 @@ import { ValidationPanel } from '@/components/spreading/ValidationPanel'
 import { LockBanner } from '@/components/spreading/LockBanner'
 import { CategoryNav } from '@/components/spreading/CategoryNav'
 import { ExpressionEditor } from '@/components/spreading/ExpressionEditor'
+import { PageToolbar } from '@/components/spreading/PageToolbar'
+import { CommentPanel } from '@/components/spreading/CommentPanel'
+import { LoadHistoricalModal } from '@/components/spreading/LoadHistoricalModal'
 import { useSpreadStore } from '@/stores/spreadStore'
 import { useWebSocketSubscription } from '@/hooks/useWebSocket'
 import type { SpreadValue, MappingResult, BoundingBox, Zone } from '@/types/spread'
 
-type RightPanel = 'values' | 'history' | 'validation'
+type RightPanel = 'values' | 'history' | 'validation' | 'comments'
 
 const zoneToCategory: Record<Zone['type'], string> = {
   bs: 'Balance Sheet',
@@ -94,6 +97,11 @@ export default function SpreadingWorkspacePage() {
   const [activeCategory, setActiveCategory] = useState<string>('All')
   const [isExpressionEditorOpen, setIsExpressionEditorOpen] = useState(false)
   const [editingValue, setEditingValue] = useState<SpreadValue | null>(null)
+  const [isSplitView, setIsSplitView] = useState(false)
+  const [splitPdfPage, setSplitPdfPage] = useState<number>(1)
+  const [showSmartFill, setShowSmartFill] = useState(false)
+  const [showCurrency, setShowCurrency] = useState(false)
+  const [isHistoricalModalOpen, setIsHistoricalModalOpen] = useState(false)
 
   const values = valuesQuery.data ?? []
   const history = historyQuery.data?.versions ?? []
@@ -290,6 +298,18 @@ export default function SpreadingWorkspacePage() {
             {autofillMutation.isPending ? 'Autofilling...' : 'Autofill from Prior'}
           </button>
         )}
+        <button className="btn btn-ghost btn-sm" onClick={() => setIsHistoricalModalOpen(true)}>
+          <Clock size={14} />
+          Historical
+        </button>
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={() => setIsSplitView((prev) => !prev)}
+          title={isSplitView ? 'Single document view' : 'Split document view'}
+        >
+          <Columns size={14} />
+          {isSplitView ? 'Single' : 'Split'}
+        </button>
         <button
           className="btn btn-primary btn-sm"
           onClick={() => {
@@ -335,15 +355,44 @@ export default function SpreadingWorkspacePage() {
           }}
         >
           {spread?.documentId ? (
-            <PdfViewer
-              documentId={spread.documentId}
-              documentUrl={`/api/documents/${spread.documentId}/download`}
-              currentPage={highlightedSourcePage ?? pdfPage}
-              pageNumber={highlightedSourcePage ?? pdfPage}
-              scale={1}
-              onZoneNavigate={(zoneType) => setActiveCategory(zoneToCategory[zoneType] ?? 'All')}
-              onPageChange={setPdfPage}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              {/* Page operations toolbar */}
+              <div style={{ padding: '4px 10px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)' }}>
+                <PageToolbar
+                  documentId={spread.documentId}
+                  currentPage={highlightedSourcePage ?? pdfPage}
+                  totalPages={999}
+                  onOperationComplete={() => showToast('Page operation completed', 'success')}
+                />
+              </div>
+
+              {/* Primary PDF viewer */}
+              <div style={{ flex: isSplitView ? undefined : 1, height: isSplitView ? '50%' : undefined }}>
+                <PdfViewer
+                  documentId={spread.documentId}
+                  documentUrl={`/api/documents/${spread.documentId}/download`}
+                  currentPage={highlightedSourcePage ?? pdfPage}
+                  pageNumber={highlightedSourcePage ?? pdfPage}
+                  scale={1}
+                  onZoneNavigate={(zoneType) => setActiveCategory(zoneToCategory[zoneType] ?? 'All')}
+                  onPageChange={setPdfPage}
+                />
+              </div>
+
+              {/* Secondary PDF viewer (split view) */}
+              {isSplitView && (
+                <div style={{ height: '50%', borderTop: '2px solid var(--border-subtle)' }}>
+                  <PdfViewer
+                    documentId={spread.documentId}
+                    documentUrl={`/api/documents/${spread.documentId}/download`}
+                    currentPage={splitPdfPage}
+                    pageNumber={splitPdfPage}
+                    scale={1}
+                    onPageChange={setSplitPdfPage}
+                  />
+                </div>
+              )}
+            </div>
           ) : (
             <div
               style={{
@@ -373,6 +422,7 @@ export default function SpreadingWorkspacePage() {
             {[
               { key: 'values' as RightPanel, label: 'Spread Values', icon: <Sparkles size={13} /> },
               { key: 'validation' as RightPanel, label: 'Validation', icon: <Shield size={13} /> },
+              { key: 'comments' as RightPanel, label: 'Comments', icon: <MessageCircle size={13} /> },
               { key: 'history' as RightPanel, label: 'History', icon: <Clock size={13} /> },
             ].map((tab) => (
               <button
@@ -433,6 +483,24 @@ export default function SpreadingWorkspacePage() {
                     />
                     <span>Show Variance</span>
                   </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showSmartFill}
+                      onChange={(e) => setShowSmartFill(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span>SmartFill</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showCurrency}
+                      onChange={(e) => setShowCurrency(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span>Currency</span>
+                  </label>
                 </div>
 
                 {/* Category nav */}
@@ -454,6 +522,8 @@ export default function SpreadingWorkspacePage() {
                 showVariance={showVariance}
                 varianceData={varianceData}
                 showOnlyMapped={showOnlyMapped}
+                showSmartFill={showSmartFill}
+                showCurrency={showCurrency}
                 spreadId={spreadId}
               />
               </div>
@@ -466,6 +536,19 @@ export default function SpreadingWorkspacePage() {
                   isLoading={processMutation.isPending}
                 />
               </div>
+            )}
+
+            {rightPanel === 'comments' && (
+              <CommentPanel
+                spreadId={spreadId}
+                selectedValueId={editingValue?.id ?? null}
+                onNavigateToSource={(url) => {
+                  const pageMatch = url.match(/page:(\d+)/i)
+                  if (pageMatch) {
+                    setPdfPage(Number(pageMatch[1]))
+                  }
+                }}
+              />
             )}
 
             {rightPanel === 'history' && (
@@ -535,6 +618,14 @@ export default function SpreadingWorkspacePage() {
           setEditingValue(null)
         }}
         onSave={handleExpressionSave}
+      />
+
+      <LoadHistoricalModal
+        open={isHistoricalModalOpen}
+        spreadId={spreadId}
+        customerId={spread?.customerId ?? ''}
+        onClose={() => setIsHistoricalModalOpen(false)}
+        onLoaded={(count) => showToast(`Loaded ${count} historical column(s)`, 'success')}
       />
     </div>
   )

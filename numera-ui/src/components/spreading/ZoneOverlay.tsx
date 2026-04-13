@@ -10,8 +10,8 @@ interface ZoneOverlayProps {
 }
 
 const zoneColors = {
-  is: '#3b82f6', // blue - Income Statement
-  bs: '#10b981', // green - Balance Sheet
+  bs: '#3b82f6', // blue - Balance Sheet
+  is: '#10b981', // green - Income Statement
   cf: '#f59e0b', // orange - Cash Flow
   notes: '#8b5cf6', // purple
   other: '#6b7280', // gray
