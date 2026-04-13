@@ -4,6 +4,7 @@ import com.numera.customer.domain.Customer
 import com.numera.model.domain.ModelTemplate
 import com.numera.shared.domain.TenantAwareEntity
 import jakarta.persistence.Column
+import org.hibernate.annotations.ColumnTransformer
 import jakarta.persistence.Entity
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
@@ -28,6 +29,7 @@ class ExpressionPattern : TenantAwareEntity() {
     var patternType: String = "EXPRESSION"
 
     @Column(nullable = false, columnDefinition = "jsonb")
+    @ColumnTransformer(write = "?::jsonb")
     var patternJson: String = "{}"
 
     @Column(nullable = false)

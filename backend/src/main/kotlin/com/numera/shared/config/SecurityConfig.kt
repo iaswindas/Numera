@@ -1,6 +1,7 @@
 package com.numera.shared.config
 
 import com.numera.shared.security.JwtAuthenticationFilter
+import com.numera.shared.security.RateLimitFilter
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -20,6 +21,7 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 @EnableMethodSecurity(prePostEnabled = true)
 class SecurityConfig(
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
+    private val rateLimitFilter: RateLimitFilter,
     @Value("\${numera.openapi.export-mode:false}")
     private val openApiExportMode: Boolean,
 ) {
@@ -66,6 +68,7 @@ class SecurityConfig(
                 it.requestMatchers("/ws/**").authenticated()
                 it.anyRequest().authenticated()
             }
+            .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter::class.java)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
 
         return http.build()

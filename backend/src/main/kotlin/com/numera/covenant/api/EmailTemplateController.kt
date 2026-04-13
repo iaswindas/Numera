@@ -5,6 +5,7 @@ import com.numera.covenant.dto.EmailTemplateRequest
 import com.numera.covenant.dto.EmailTemplateResponse
 import com.numera.covenant.dto.SignatureRequest
 import com.numera.covenant.dto.SignatureResponse
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
@@ -35,14 +36,14 @@ class EmailTemplateController(
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun createTemplate(
-        @RequestBody request: EmailTemplateRequest,
+        @Valid @RequestBody request: EmailTemplateRequest,
         @RequestParam(required = false) actorId: UUID?,
     ): EmailTemplateResponse = emailTemplateService.createTemplate(request, actorId)
 
     @PutMapping("/{id}")
     fun updateTemplate(
         @PathVariable id: UUID,
-        @RequestBody request: EmailTemplateRequest,
+        @Valid @RequestBody request: EmailTemplateRequest,
     ): EmailTemplateResponse = emailTemplateService.updateTemplate(id, request)
 
     @PatchMapping("/{id}/active")
@@ -62,14 +63,14 @@ class EmailTemplateController(
     @PostMapping("/signatures")
     @ResponseStatus(HttpStatus.CREATED)
     fun createSignature(
-        @RequestBody request: SignatureRequest,
+        @Valid @RequestBody request: SignatureRequest,
         @RequestParam(required = false) actorId: UUID?,
     ): SignatureResponse = emailTemplateService.createSignature(request, actorId)
 
     @PutMapping("/signatures/{id}")
     fun updateSignature(
         @PathVariable id: UUID,
-        @RequestBody request: SignatureRequest,
+        @Valid @RequestBody request: SignatureRequest,
     ): SignatureResponse = emailTemplateService.updateSignature(id, request)
 
     @PatchMapping("/signatures/{id}/active")

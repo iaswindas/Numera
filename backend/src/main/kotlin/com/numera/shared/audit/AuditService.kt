@@ -1,6 +1,7 @@
 package com.numera.shared.audit
 
 import com.numera.shared.security.CurrentUserProvider
+import com.numera.shared.util.LogSanitizer
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -44,7 +45,7 @@ class AuditService(
             it.entityId = entityId
             it.parentEntityType = parentEntityType
             it.parentEntityId = parentEntityId
-            it.diffJson = diffJson
+            it.diffJson = LogSanitizer.sanitize(diffJson)
             it.previousHash = previousHash
             it.currentHash = currentHash
         })

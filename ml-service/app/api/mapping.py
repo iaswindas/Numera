@@ -1,7 +1,9 @@
 """POST /api/ml/mapping/suggest — Mapping with A/B testing and tenant support."""
 
+import asyncio
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, Header, Request
 from typing import Optional
@@ -15,6 +17,9 @@ from app.ml.semantic_matcher import SemanticMatcher
 
 router = APIRouter()
 logger = logging.getLogger("ml-service.api.mapping")
+
+# Thread pool for CPU-bound Sentence-BERT inference
+_matcher_executor = ThreadPoolExecutor(max_workers=4)
 
 
 @router.post("/suggest", response_model=MappingSuggestionResponse)
@@ -47,7 +52,11 @@ async def suggest_mapping(
     if request.taxonomy_path:
         matcher.load_taxonomy(request.taxonomy_path)
 
-    mappings, model_version = matcher.match(request.source_rows, request.target_items)
+    loop = asyncio.get_event_loop()
+    mappings, model_version = await loop.run_in_executor(
+        _matcher_executor,
+        lambda: matcher.match(request.source_rows, request.target_items),
+    )
 
     # Generate summary stats
     high = sum(

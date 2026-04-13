@@ -26,6 +26,9 @@ import com.numera.shared.exception.ErrorCode
 import com.numera.shared.infrastructure.DomainEventPublisher
 import com.numera.shared.security.CurrentUserProvider
 import com.numera.shared.security.TenantContext
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageImpl
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -50,7 +53,8 @@ class DocumentProcessingService(
     private val taskExecutor: Executor,
     private val transactionTemplate: TransactionTemplate,
 ) {
-    fun list(customerId: UUID?, uploadedBy: String?, status: DocumentStatus?): List<DocumentResponse> {
+    @Transactional(readOnly = true)
+    fun list(customerId: UUID?, uploadedBy: String?, status: DocumentStatus?, pageable: Pageable? = null): Page<DocumentResponse> {
         val tenantId = TenantContext.get()?.let { UUID.fromString(it) } ?: TenantAwareEntity.DEFAULT_TENANT
         val effectiveUploadedBy = resolveUploadedByFilter(uploadedBy)
 
@@ -77,7 +81,14 @@ class DocumentProcessingService(
         }
 
         val docs = documentRepository.findAll(spec)
-        return docs.sortedByDescending { it.createdAt }.map { it.toResponse() }
+        val responses = docs.sortedByDescending { it.createdAt }.map { it.toResponse() }
+        return if (pageable != null) {
+            val start = pageable.offset.toInt().coerceAtMost(responses.size)
+            val end = (start + pageable.pageSize).coerceAtMost(responses.size)
+            PageImpl(responses.subList(start, end), pageable, responses.size.toLong())
+        } else {
+            PageImpl(responses)
+        }
     }
 
     @Transactional
@@ -91,6 +102,7 @@ class DocumentProcessingService(
         val uploadedByName = currentUser?.fullName ?: "System"
 
         val safeFilename = sanitizeFilename(file.originalFilename ?: "document.pdf")
+        validateFileExtension(safeFilename, file.contentType)
 
         val saved = documentRepository.save(Document().also {
             it.tenantId = customer.tenantId
@@ -203,18 +215,21 @@ class DocumentProcessingService(
         }
     }
 
+    @Transactional(readOnly = true)
     fun getDocument(documentId: UUID): DocumentResponse {
         val document = documentRepository.findById(documentId)
             .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Document not found") }
         return document.toResponse()
     }
 
+    @Transactional(readOnly = true)
     fun getStatus(documentId: UUID): DocumentStatusResponse {
         val document = documentRepository.findById(documentId)
             .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Document not found") }
         return DocumentStatusResponse(document.id.toString(), document.status, document.errorMessage)
     }
 
+    @Transactional(readOnly = true)
     fun zones(documentId: UUID): ZonesResponse =
         ZonesResponse(
             documentId = documentId.toString(),
@@ -267,6 +282,7 @@ class DocumentProcessingService(
         documentRepository.delete(document)
     }
 
+    @Transactional(readOnly = true)
     fun getDocumentEntity(documentId: UUID): Document =
         documentRepository.findById(documentId)
             .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Document not found") }
@@ -316,12 +332,35 @@ class DocumentProcessingService(
     private fun readMetadata(zone: DetectedZone): Map<String, Any?> =
         if (zone.metadataJson.isNullOrBlank()) emptyMap() else objectMapper.readValue(zone.metadataJson, Map::class.java) as Map<String, Any?>
 
+    private val ALLOWED_EXTENSIONS = mapOf(
+        "application/pdf" to listOf(".pdf"),
+        "application/vnd.ms-excel" to listOf(".xls"),
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" to listOf(".xlsx"),
+        "image/png" to listOf(".png"),
+        "image/jpeg" to listOf(".jpg", ".jpeg"),
+        "image/tiff" to listOf(".tif", ".tiff"),
+        "application/msword" to listOf(".doc"),
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" to listOf(".docx"),
+    )
+
     private fun sanitizeFilename(name: String): String {
         val basename = name.substringAfterLast('/').substringAfterLast('\\')
-        val cleaned = basename.replace(Regex("[\\x00-\\x1f\\x7f;|&`\$!#]"), "")
-            .replace("..", "_")
-            .trim()
-        return cleaned.ifBlank { "document.pdf" }
+        val cleaned = basename.replace(Regex("[^a-zA-Z0-9._()-]"), "_")
+            .replace(Regex("\\.{2,}"), ".")
+            .replace(Regex("^[.]"), "_")
+        val ext = cleaned.substringAfterLast('.', "")
+        val stem = cleaned.substringBeforeLast('.', cleaned)
+        val safeStem = stem.take(200)
+        return if (ext.isNotBlank()) "$safeStem.$ext" else cleaned.ifBlank { "document.pdf" }
+    }
+
+    private fun validateFileExtension(filename: String, contentType: String?) {
+        if (contentType == null) return
+        val allowedExts = ALLOWED_EXTENSIONS[contentType] ?: return
+        val ext = ".${filename.substringAfterLast('.', "").lowercase()}"
+        if (ext !in allowedExts) {
+            throw ApiException(ErrorCode.VALIDATION_ERROR, "File extension '$ext' does not match content type '$contentType'. Allowed: $allowedExts")
+        }
     }
 
     private fun resolveUploadedByFilter(uploadedBy: String?): String? {

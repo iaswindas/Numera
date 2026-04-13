@@ -21,6 +21,9 @@ import com.numera.shared.domain.TenantAwareEntity
 import com.numera.shared.security.TenantContext
 import com.numera.shared.exception.ApiException
 import com.numera.shared.exception.ErrorCode
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageImpl
+import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
@@ -38,9 +41,19 @@ class CovenantService(
 
     // ── Covenant Customers ────────────────────────────────────────────────
 
-    fun listCovenantCustomers(query: String?): List<CovenantCustomerResponse> =
-        covenantCustomerRepository.search(resolvedTenantId(), query).map { it.toResponse() }
+    @Transactional(readOnly = true)
+    fun listCovenantCustomers(query: String?, pageable: Pageable? = null): Page<CovenantCustomerResponse> {
+        val results = covenantCustomerRepository.search(resolvedTenantId(), query).map { it.toResponse() }
+        return if (pageable != null) {
+            val start = pageable.offset.toInt().coerceAtMost(results.size)
+            val end = (start + pageable.pageSize).coerceAtMost(results.size)
+            PageImpl(results.subList(start, end), pageable, results.size.toLong())
+        } else {
+            PageImpl(results)
+        }
+    }
 
+    @Transactional(readOnly = true)
     fun getCovenantCustomer(id: UUID): CovenantCustomerResponse =
         covenantCustomerRepository.findById(id)
             .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Covenant customer not found: $id") }
@@ -106,9 +119,19 @@ class CovenantService(
 
     // ── Covenant Definitions ──────────────────────────────────────────────
 
-    fun listCovenants(covenantCustomerId: UUID): List<CovenantResponse> =
-        covenantRepository.findByCovenantCustomerIdAndIsActiveTrue(covenantCustomerId).map { it.toResponse() }
+    @Transactional(readOnly = true)
+    fun listCovenants(covenantCustomerId: UUID, pageable: Pageable? = null): Page<CovenantResponse> {
+        val results = covenantRepository.findByCovenantCustomerIdAndIsActiveTrue(covenantCustomerId).map { it.toResponse() }
+        return if (pageable != null) {
+            val start = pageable.offset.toInt().coerceAtMost(results.size)
+            val end = (start + pageable.pageSize).coerceAtMost(results.size)
+            PageImpl(results.subList(start, end), pageable, results.size.toLong())
+        } else {
+            PageImpl(results)
+        }
+    }
 
+    @Transactional(readOnly = true)
     fun getCovenant(id: UUID): CovenantResponse =
         covenantRepository.findById(id)
             .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Covenant not found: $id") }

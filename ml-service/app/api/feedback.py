@@ -8,7 +8,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Header, HTTPException, Query, Request
 
 from app.api.models import (
     FeedbackExportResponse,
@@ -33,12 +33,24 @@ async def _get_feedback_store(http_request: Request) -> FeedbackStore:
 
 
 @router.post("/feedback", response_model=FeedbackResponse)
-async def submit_feedback(request: FeedbackRequest, http_request: Request):
+async def submit_feedback(
+    request: FeedbackRequest,
+    http_request: Request,
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+):
     """Accept analyst corrections to ML mapping suggestions.
 
     Corrections are stored in PostgreSQL (or in-memory if PG unavailable)
     and used for periodic model retraining via Colab notebooks.
     """
+    # --- Tenant isolation: reject mismatched tenant IDs ---
+    for item in request.corrections:
+        if x_tenant_id and item.tenant_id and item.tenant_id != x_tenant_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Tenant ID mismatch: correction tenant_id does not match X-Tenant-ID header",
+            )
+
     store = await _get_feedback_store(http_request)
 
     corrections = [

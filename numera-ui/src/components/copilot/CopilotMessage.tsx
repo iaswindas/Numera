@@ -2,6 +2,7 @@
 
 import React from 'react'
 import type { CopilotMessage as CopilotMessageType, CopilotCitation } from '@/hooks/useCopilot'
+import { sanitizeHtml } from '@/utils/sanitize'
 
 interface Props {
   message: CopilotMessageType
@@ -50,7 +51,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
       .replace(/\[Source (\d+)\]/g, '<span class="text-blue-600 font-medium cursor-pointer">[Source $1]</span>')
 
     nodes.push(
-      <span key={`line-${i}`} dangerouslySetInnerHTML={{ __html: formatted }} />,
+      <span key={`line-${i}`} dangerouslySetInnerHTML={{ __html: sanitizeHtml(formatted) }} />,
     )
     if (i < lines.length - 1) {
       nodes.push(<br key={`br-${i}`} />)

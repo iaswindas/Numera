@@ -1,25 +1,29 @@
 package com.numera.covenant.dto
 
+import jakarta.validation.constraints.Digits
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
+import jakarta.validation.constraints.Size
 import java.math.BigDecimal
 import java.util.UUID
 
 data class CovenantRequest(
-    val covenantCustomerId: UUID,
-    val covenantType: String,
-    val name: String,
-    val description: String? = null,
-    val frequency: String,
+    @field:NotNull val covenantCustomerId: UUID,
+    @field:NotBlank @field:Size(max = 50) val covenantType: String,
+    @field:NotBlank @field:Size(max = 200) val name: String,
+    @field:Size(max = 2000) val description: String? = null,
+    @field:NotBlank @field:Size(max = 50) val frequency: String,
     // Financial fields
-    val formula: String? = null,
-    val operator: String? = null,
-    val thresholdValue: BigDecimal? = null,
-    val thresholdMin: BigDecimal? = null,
-    val thresholdMax: BigDecimal? = null,
+    @field:Size(max = 2000) val formula: String? = null,
+    @field:Size(max = 50) val operator: String? = null,
+    @field:Digits(integer = 15, fraction = 6) val thresholdValue: BigDecimal? = null,
+    @field:Digits(integer = 15, fraction = 6) val thresholdMin: BigDecimal? = null,
+    @field:Digits(integer = 15, fraction = 6) val thresholdMax: BigDecimal? = null,
     // Non-financial fields
-    val documentType: String? = null,
-    val itemType: String? = null,
+    @field:Size(max = 50) val documentType: String? = null,
+    @field:Size(max = 50) val itemType: String? = null,
     // Audit & Compliance
-    val auditMethod: String? = null,
+    @field:Size(max = 50) val auditMethod: String? = null,
     // Reminder Configuration
     val reminderDaysBefore: Int = 7,
     val reminderDaysAfter: Int = 3,

@@ -2,6 +2,7 @@ package com.numera.document.domain
 
 import com.numera.shared.domain.BaseEntity
 import jakarta.persistence.Column
+import org.hibernate.annotations.ColumnTransformer
 import jakarta.persistence.Entity
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
@@ -30,5 +31,6 @@ class DetectedZone : BaseEntity() {
     var pageNumber: Int? = null
 
     @Column(columnDefinition = "jsonb")
+    @ColumnTransformer(write = "?::jsonb")
     var metadataJson: String? = null
 }

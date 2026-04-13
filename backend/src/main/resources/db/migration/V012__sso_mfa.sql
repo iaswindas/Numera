@@ -4,12 +4,12 @@
 
 -- Add SSO and MFA fields to users table
 ALTER TABLE users
-    ADD COLUMN last_login_at     TIMESTAMPTZ,
-    ADD COLUMN sso_provider      VARCHAR(50),
-    ADD COLUMN sso_subject_id    VARCHAR(255),
-    ADD COLUMN mfa_enabled       BOOLEAN NOT NULL DEFAULT FALSE,
-    ADD COLUMN mfa_secret        VARCHAR(255),
-    ADD COLUMN mfa_verified      BOOLEAN NOT NULL DEFAULT FALSE;
+    ADD COLUMN IF NOT EXISTS last_login_at     TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS sso_provider      VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS sso_subject_id    VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS mfa_enabled       BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS mfa_secret        VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS mfa_verified      BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- SSO provider configurations per tenant
 CREATE TABLE sso_configurations (

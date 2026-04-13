@@ -1,0 +1,188 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e46]:
+    - complementary [ref=e47]:
+      - generic [ref=e48]:
+        - generic [ref=e49]: "N"
+        - generic [ref=e50]: Numera
+      - generic [ref=e51]:
+        - generic [ref=e52]: Main
+        - link "Dashboard" [ref=e53] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e54]
+          - generic [ref=e59]: Dashboard
+      - generic [ref=e60]:
+        - generic [ref=e61]: Spreading
+        - link "Search Customer" [ref=e62] [cursor=pointer]:
+          - /url: /customers
+          - img [ref=e63]
+          - generic [ref=e66]: Search Customer
+        - link "File Store" [ref=e67] [cursor=pointer]:
+          - /url: /documents
+          - img [ref=e68]
+          - generic [ref=e71]: File Store
+      - generic [ref=e72]:
+        - generic [ref=e73]: Approvals
+        - link "Pending Approvals" [ref=e74] [cursor=pointer]:
+          - /url: /approvals
+          - img [ref=e75]
+          - generic [ref=e78]: Pending Approvals
+      - generic [ref=e79]:
+        - generic [ref=e80]: Covenants
+        - link "Covenant Mgmt 3" [ref=e81] [cursor=pointer]:
+          - /url: /covenants/management
+          - img [ref=e82]
+          - generic [ref=e84]: Covenant Mgmt
+          - generic [ref=e85]: "3"
+        - link "Covenant Items" [ref=e86] [cursor=pointer]:
+          - /url: /covenants
+          - img [ref=e87]
+          - generic [ref=e90]: Covenant Items
+        - link "Intelligence" [ref=e91] [cursor=pointer]:
+          - /url: /covenant-intelligence
+          - img [ref=e92]
+          - generic [ref=e94]: Intelligence
+        - link "Formula Mgmt" [ref=e95] [cursor=pointer]:
+          - /url: /admin/formulas
+          - img [ref=e96]
+          - generic [ref=e98]: Formula Mgmt
+        - link "Email Templates" [ref=e99] [cursor=pointer]:
+          - /url: /email-templates
+          - img [ref=e100]
+          - generic [ref=e103]: Email Templates
+      - generic [ref=e104]:
+        - generic [ref=e105]: Analytics
+        - link "Portfolio Analytics" [ref=e106] [cursor=pointer]:
+          - /url: /portfolio
+          - img [ref=e107]
+          - generic [ref=e109]: Portfolio Analytics
+        - link "Reports & MIS" [ref=e110] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e111]
+          - generic [ref=e113]: Reports & MIS
+      - generic [ref=e114]:
+        - generic [ref=e115]: Admin
+        - link "User Management" [ref=e116] [cursor=pointer]:
+          - /url: /admin/users
+          - img [ref=e117]
+          - generic [ref=e122]: User Management
+        - link "Languages" [ref=e123] [cursor=pointer]:
+          - /url: /admin/languages
+          - img [ref=e124]
+          - generic [ref=e128]: Languages
+        - link "Taxonomy & Zones" [ref=e129] [cursor=pointer]:
+          - /url: /admin/taxonomy
+          - img [ref=e130]
+          - generic [ref=e132]: Taxonomy & Zones
+        - link "Workflow Designer" [ref=e133] [cursor=pointer]:
+          - /url: /admin/workflows
+          - img [ref=e134]
+          - generic [ref=e138]: Workflow Designer
+      - generic [ref=e139]:
+        - link "Settings" [ref=e140] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e141]
+          - generic [ref=e144]: Settings
+        - generic [ref=e145]:
+          - generic [ref=e146]: JD
+          - generic [ref=e147]:
+            - generic [ref=e148]: John Doe
+            - generic [ref=e149]: Analyst
+    - generic [ref=e150]:
+      - banner [ref=e151]:
+        - generic [ref=e152]:
+          - generic [ref=e154]: Spreading
+          - generic [ref=e311]:
+            - img [ref=e312]
+            - generic [ref=e314]: Search Customer
+        - generic [ref=e155]:
+          - generic [ref=e156]:
+            - img [ref=e157]
+            - textbox "Search anything..." [ref=e160]
+          - img [ref=e162] [cursor=pointer]
+          - generic [ref=e166]: JD
+      - generic [ref=e167]:
+        - generic [ref=e315]:
+          - heading "Search Customer" [level=1] [ref=e316]
+          - paragraph [ref=e317]: Search and manage customer records for financial spreading
+        - generic [ref=e318]:
+          - generic [ref=e320]:
+            - img [ref=e321]
+            - textbox "Search by customer name or code..." [ref=e324]
+          - button "Add Customer" [ref=e326] [cursor=pointer]:
+            - img [ref=e327]
+            - text: Add Customer
+        - table [ref=e329]:
+          - rowgroup [ref=e330]:
+            - row "Customer Name Customer Code Industry Country Relationship Manager Actions" [ref=e331]:
+              - columnheader "Customer Name" [ref=e332]
+              - columnheader "Customer Code" [ref=e333]
+              - columnheader "Industry" [ref=e334]
+              - columnheader "Country" [ref=e335]
+              - columnheader "Relationship Manager" [ref=e336]
+              - columnheader "Actions" [ref=e337]
+          - rowgroup [ref=e338]:
+            - row "Test Cust 4555 Bank AE - View Items" [ref=e339]:
+              - cell "Test Cust" [ref=e340]:
+                - generic [ref=e341]:
+                  - img [ref=e342]
+                  - generic [ref=e346]: Test Cust
+              - cell "4555" [ref=e347]
+              - cell "Bank" [ref=e348]
+              - cell "AE" [ref=e349]
+              - cell "-" [ref=e350]
+              - cell "View Items" [ref=e351]:
+                - link "View Items" [ref=e352] [cursor=pointer]:
+                  - /url: /customers/b2b448b9-ead5-4ef2-ba7b-1a6183bfc81b/items
+            - row "Autotest Customer AUTO-001 Manufacturing US RM Test View Items" [ref=e353]:
+              - cell "Autotest Customer" [ref=e354]:
+                - generic [ref=e355]:
+                  - img [ref=e356]
+                  - generic [ref=e360]: Autotest Customer
+              - cell "AUTO-001" [ref=e361]
+              - cell "Manufacturing" [ref=e362]
+              - cell "US" [ref=e363]
+              - cell "RM Test" [ref=e364]
+              - cell "View Items" [ref=e365]:
+                - link "View Items" [ref=e366] [cursor=pointer]:
+                  - /url: /customers/9ed619cc-0f96-43e0-b6ae-ebeac223206d/items
+            - row "Autotest 0413191114 AUTO0413191114 Manufacturing US RM Test View Items" [ref=e367]:
+              - cell "Autotest 0413191114" [ref=e368]:
+                - generic [ref=e369]:
+                  - img [ref=e370]
+                  - generic [ref=e374]: Autotest 0413191114
+              - cell "AUTO0413191114" [ref=e375]
+              - cell "Manufacturing" [ref=e376]
+              - cell "US" [ref=e377]
+              - cell "RM Test" [ref=e378]
+              - cell "View Items" [ref=e379]:
+                - link "View Items" [ref=e380] [cursor=pointer]:
+                  - /url: /customers/bdad1fc8-65a6-43d9-9ec9-f118cdcc1711/items
+            - row "Test Customer Inc CUST-001 Technology US John Doe View Items" [ref=e381]:
+              - cell "Test Customer Inc" [ref=e382]:
+                - generic [ref=e383]:
+                  - img [ref=e384]
+                  - generic [ref=e388]: Test Customer Inc
+              - cell "CUST-001" [ref=e389]
+              - cell "Technology" [ref=e390]
+              - cell "US" [ref=e391]
+              - cell "John Doe" [ref=e392]
+              - cell "View Items" [ref=e393]:
+                - link "View Items" [ref=e394] [cursor=pointer]:
+                  - /url: /customers/14880891-3412-4678-b912-11e674d121d4/items
+            - row "UI Flow Customer UIAUTO-001 Services US UI RM View Items" [ref=e417]:
+              - cell "UI Flow Customer" [ref=e418]:
+                - generic [ref=e419]:
+                  - img [ref=e420]
+                  - generic [ref=e424]: UI Flow Customer
+              - cell "UIAUTO-001" [ref=e425]
+              - cell "Services" [ref=e426]
+              - cell "US" [ref=e427]
+              - cell "UI RM" [ref=e428]
+              - cell "View Items" [ref=e429]:
+                - link "View Items" [ref=e430] [cursor=pointer]:
+                  - /url: /customers/0fdd4090-f828-4501-b350-3f75cddba53d/items
+  - generic [ref=e432]: Customer created
+  - button "Open Next.js Dev Tools" [ref=e41] [cursor=pointer]:
+    - img [ref=e42]
+  - alert [ref=e45]
+  - generic [ref=e310]: "0"

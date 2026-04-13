@@ -1,7 +1,9 @@
 """POST /api/ml/zones/classify — Zone classification with VLM pre-labels + A/B testing."""
 
+import asyncio
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Literal
 
 from fastapi import APIRouter, Request
@@ -16,6 +18,9 @@ from app.ml.zone_classifier import LayoutLMZoneClassifier, classify_by_keywords
 
 router = APIRouter()
 logger = logging.getLogger("ml-service.api.zones")
+
+# Thread pool for CPU-bound ML inference (keeps event loop responsive)
+_inference_executor = ThreadPoolExecutor(max_workers=4)
 
 # Valid VLM zone types that map directly to our ZoneType enum
 _VLM_ZONE_MAP = {zt.value: zt for zt in ZoneType}
@@ -101,7 +106,11 @@ async def classify_zones(request: ZoneClassificationRequest, http_request: Reque
 
         # ─── 3. LayoutLM (if heuristic is low confidence) ───
         if heur_conf < 0.80 and zone_classifier.is_loaded:
-            ml_type, ml_conf, ml_version = zone_classifier.classify(raw_text, bboxes)
+            loop = asyncio.get_event_loop()
+            ml_type, ml_conf, ml_version = await loop.run_in_executor(
+                _inference_executor,
+                lambda t=raw_text, b=bboxes: zone_classifier.classify(t, b),
+            )
             model_version = ml_version
             if heur_type == ml_type:
                 meth = "COMBINED"

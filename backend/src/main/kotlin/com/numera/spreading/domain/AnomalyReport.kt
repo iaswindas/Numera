@@ -2,6 +2,7 @@ package com.numera.spreading.domain
 
 import com.numera.shared.domain.BaseEntity
 import jakarta.persistence.Column
+import org.hibernate.annotations.ColumnTransformer
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
 import org.springframework.data.jpa.repository.JpaRepository
@@ -23,6 +24,7 @@ class AnomalyReport : BaseEntity() {
     var summary: String = ""
 
     @Column(name = "anomalies_json", nullable = false, columnDefinition = "jsonb")
+    @ColumnTransformer(write = "?::jsonb")
     var anomaliesJson: String = "[]"
 
     @Column(name = "checked_at", nullable = false)

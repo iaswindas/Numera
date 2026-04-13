@@ -10,6 +10,10 @@ import com.numera.document.dto.ZoneUpdateRequest
 import com.numera.document.dto.ZonesResponse
 import jakarta.validation.Valid
 import org.springframework.core.io.InputStreamResource
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Sort
+import org.springframework.data.web.PageableDefault
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -37,7 +41,9 @@ class DocumentController(
         @RequestParam(required = false) customerId: UUID?,
         @RequestParam(required = false) uploadedBy: String?,
         @RequestParam(required = false) status: DocumentStatus?,
-    ): List<DocumentResponse> = documentProcessingService.list(customerId, uploadedBy, status)
+        @PageableDefault(size = 20, sort = ["createdAt"], direction = Sort.Direction.DESC)
+        pageable: Pageable,
+    ): Page<DocumentResponse> = documentProcessingService.list(customerId, uploadedBy, status, pageable)
 
     @PostMapping("/documents/upload")
     @ResponseStatus(HttpStatus.ACCEPTED)

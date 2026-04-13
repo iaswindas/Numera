@@ -41,8 +41,8 @@ data class NumeraProperties(
 
     data class Storage(
         val endpoint: String = "http://localhost:9000",
-        val accessKey: String = "minioadmin",
-        val secretKey: String = "minioadmin",
+        val accessKey: String = "",
+        val secretKey: String = "",
         val bucket: String = "numera-docs",
     )
 

@@ -3,8 +3,6 @@ package com.numera.covenant.domain
 import com.numera.shared.domain.TenantAwareEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
-import jakarta.persistence.EnumType
-import jakarta.persistence.Enumerated
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
@@ -23,7 +21,6 @@ class WaiverLetter : TenantAwareEntity() {
     @JoinColumn(name = "monitoring_item_id")
     lateinit var monitoringItem: CovenantMonitoringItem
 
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     var waiverType: String = "INSTANCE"  // INSTANCE or PERMANENT
 

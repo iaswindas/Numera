@@ -5,6 +5,11 @@ import com.numera.covenant.dto.CovenantCustomerRequest
 import com.numera.covenant.dto.CovenantCustomerResponse
 import com.numera.covenant.dto.CovenantRequest
 import com.numera.covenant.dto.CovenantResponse
+import jakarta.validation.Valid
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Sort
+import org.springframework.data.web.PageableDefault
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -30,7 +35,9 @@ class CovenantController(
     @GetMapping("/customers")
     fun listCustomers(
         @RequestParam(required = false) query: String?,
-    ): List<CovenantCustomerResponse> = covenantService.listCovenantCustomers(query)
+        @PageableDefault(size = 20, sort = ["createdAt"], direction = Sort.Direction.DESC)
+        pageable: Pageable,
+    ): Page<CovenantCustomerResponse> = covenantService.listCovenantCustomers(query, pageable)
 
     @GetMapping("/customers/{id}")
     fun getCustomer(@PathVariable id: UUID): CovenantCustomerResponse =
@@ -38,13 +45,13 @@ class CovenantController(
 
     @PostMapping("/customers")
     @ResponseStatus(HttpStatus.CREATED)
-    fun createCustomer(@RequestBody request: CovenantCustomerRequest): CovenantCustomerResponse =
+    fun createCustomer(@Valid @RequestBody request: CovenantCustomerRequest): CovenantCustomerResponse =
         covenantService.createCovenantCustomer(request)
 
     @PutMapping("/customers/{id}")
     fun updateCustomer(
         @PathVariable id: UUID,
-        @RequestBody request: CovenantCustomerRequest,
+        @Valid @RequestBody request: CovenantCustomerRequest,
     ): CovenantCustomerResponse = covenantService.updateCovenantCustomer(id, request)
 
     @PatchMapping("/customers/{id}/active")
@@ -58,7 +65,9 @@ class CovenantController(
     @GetMapping("/definitions")
     fun listCovenants(
         @RequestParam covenantCustomerId: UUID,
-    ): List<CovenantResponse> = covenantService.listCovenants(covenantCustomerId)
+        @PageableDefault(size = 20, sort = ["createdAt"], direction = Sort.Direction.DESC)
+        pageable: Pageable,
+    ): Page<CovenantResponse> = covenantService.listCovenants(covenantCustomerId, pageable)
 
     @GetMapping("/definitions/{id}")
     fun getCovenant(@PathVariable id: UUID): CovenantResponse =
@@ -66,13 +75,13 @@ class CovenantController(
 
     @PostMapping("/definitions")
     @ResponseStatus(HttpStatus.CREATED)
-    fun createCovenant(@RequestBody request: CovenantRequest): CovenantResponse =
+    fun createCovenant(@Valid @RequestBody request: CovenantRequest): CovenantResponse =
         covenantService.createCovenant(request)
 
     @PutMapping("/definitions/{id}")
     fun updateCovenant(
         @PathVariable id: UUID,
-        @RequestBody request: CovenantRequest,
+        @Valid @RequestBody request: CovenantRequest,
     ): CovenantResponse = covenantService.updateCovenant(id, request)
 
     @DeleteMapping("/definitions/{id}")
