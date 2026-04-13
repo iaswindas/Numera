@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "gitstatus-runner": {
+      "type": "stdio",
+      "command": "C:\\Users\\ASUS\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+      "args": [
+        "F:\\Context\\scripts\\__copilot_gitstatus_mcp_server.py"
+      ]
+    }
+  }
+}
