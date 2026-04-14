@@ -29,6 +29,8 @@ import com.numera.shared.security.TenantContext
 import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.web.multipart.MultipartFile
 import java.util.Locale
@@ -116,7 +118,7 @@ class DocumentProcessingService(
             parentEntityId = customer.id.toString(),
         )
 
-        queueProcessing(saved.id!!, password)
+        queueProcessingAfterCommit(saved.id!!, password)
 
         return DocumentUploadResponse(
             documentId = saved.id.toString(),
@@ -130,12 +132,16 @@ class DocumentProcessingService(
         processInternal(documentId, password)
     } ?: throw ApiException(ErrorCode.INTERNAL_ERROR, "Unable to process document")
 
-    private fun queueProcessing(documentId: UUID, password: String?) {
-        taskExecutor.execute {
-            transactionTemplate.executeWithoutResult {
-                processInternal(documentId, password)
+    private fun queueProcessingAfterCommit(documentId: UUID, password: String?) {
+        TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+            override fun afterCommit() {
+                taskExecutor.execute {
+                    transactionTemplate.executeWithoutResult {
+                        processInternal(documentId, password)
+                    }
+                }
             }
-        }
+        })
     }
 
     private fun processInternal(documentId: UUID, password: String? = null): DocumentStatusResponse {

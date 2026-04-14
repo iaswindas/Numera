@@ -2,6 +2,7 @@ package com.numera.shared.exception
 
 import jakarta.persistence.EntityNotFoundException
 import org.slf4j.LoggerFactory
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.MethodArgumentNotValidException
@@ -31,6 +32,20 @@ class GlobalExceptionHandler {
     fun handleEntityNotFound(ex: EntityNotFoundException): ResponseEntity<ErrorResponse> =
         ResponseEntity.status(HttpStatus.NOT_FOUND)
             .body(ErrorResponse(ErrorCode.NOT_FOUND, ex.message ?: "Entity not found"))
+
+    @ExceptionHandler(DataIntegrityViolationException::class)
+    fun handleDataIntegrityViolation(ex: DataIntegrityViolationException): ResponseEntity<ErrorResponse> {
+        log.warn("Data integrity violation: {}", ex.mostSpecificCause.message)
+        val message = when {
+            ex.mostSpecificCause.message?.contains("duplicate key") == true ->
+                "A record with the same unique value already exists."
+            ex.mostSpecificCause.message?.contains("foreign key") == true ->
+                "Referenced record does not exist or is still in use."
+            else -> "Data constraint violation."
+        }
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(ErrorResponse(ErrorCode.CONFLICT, message))
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidation(ex: MethodArgumentNotValidException): ResponseEntity<ErrorResponse> {

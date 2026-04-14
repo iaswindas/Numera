@@ -1,11 +1,14 @@
 'use client'
 
 import { useMemo, useRef, useCallback } from 'react'
+import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
 import { AgGridReact } from 'ag-grid-react'
 import type { ColDef, CellClassParams, CellClickedEvent, CellDoubleClickedEvent } from 'ag-grid-community'
 import type { SpreadValue, SpreadVarianceDto } from '@/types/spread'
 import { NoteEditor } from './NoteEditor'
 import { useUpdateSpreadValueNotes } from '@/services/spreadApi'
+
+ModuleRegistry.registerModules([AllCommunityModule])
 
 interface SpreadTableProps {
   values: SpreadValue[]

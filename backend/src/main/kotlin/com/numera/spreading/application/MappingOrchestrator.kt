@@ -72,6 +72,7 @@ class MappingOrchestrator(
         )
 
         spreadValueRepo.deleteAll(spreadValueRepo.findBySpreadItemId(spreadItem.id!!))
+        spreadValueRepo.flush()
 
         val mappedByCode: Map<String, Map<String, Any>> = expressionResult?.expressions
             ?.mapNotNull { exp ->

@@ -275,7 +275,7 @@ class SpreadService(
         spreadVersionService.rollback(spreadItemId, version, comments)
 
     @Transactional
-    fun approveSpread(spreadId: UUID, comment: String?, approverId: UUID): SubmitSpreadResponse {
+    fun approveSpread(spreadId: UUID, comment: String?, approverId: String): SubmitSpreadResponse {
         val spread = spreadItemRepository.findById(spreadId)
             .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Spread item not found") }
 
@@ -293,7 +293,7 @@ class SpreadService(
             spreadItemId = spreadId,
             action = "APPROVED",
             comments = comment,
-            createdBy = approverId.toString(),
+            createdBy = approverId,
             cellsChanged = 0,
         )
 
@@ -315,7 +315,7 @@ class SpreadService(
     }
 
     @Transactional
-    fun rejectSpread(spreadId: UUID, comment: String, approverId: UUID): SubmitSpreadResponse {
+    fun rejectSpread(spreadId: UUID, comment: String, approverId: String): SubmitSpreadResponse {
         val spread = spreadItemRepository.findById(spreadId)
             .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Spread item not found") }
 
@@ -340,7 +340,7 @@ class SpreadService(
             spreadItemId = spreadId,
             action = "REJECTED",
             comments = comment,
-            createdBy = approverId.toString(),
+            createdBy = approverId,
             cellsChanged = 0,
         )
 

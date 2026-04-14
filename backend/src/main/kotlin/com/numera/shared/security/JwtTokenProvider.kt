@@ -69,7 +69,10 @@ class JwtTokenProvider(
     fun getAuthentication(token: String): Authentication {
         val claims = parseClaims(token)
         val authorities = (claims["roles"] as? Collection<*>)
-            ?.map { SimpleGrantedAuthority(it.toString()) }
+            ?.map { role ->
+                val name = role.toString()
+                SimpleGrantedAuthority(if (name.startsWith("ROLE_")) name else "ROLE_$name")
+            }
             ?: emptyList()
         val tenantId = claims["tenantId"]?.toString()
         if (tenantId != null) {

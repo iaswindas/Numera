@@ -58,20 +58,18 @@ class SpreadController(
     @PostMapping("/spread-items/{id}/approve")
     @PreAuthorize("hasAnyRole('CHECKER','MANAGER','ADMIN')")
     fun approve(@PathVariable id: UUID, @RequestParam(required = false) comment: String?): SubmitSpreadResponse {
-        val approverId = UUID.fromString(
-            SecurityContextHolder.getContext().authentication?.name ?: throw IllegalArgumentException("User not authenticated")
-        )
-        return spreadService.approveSpread(id, comment, approverId)
+        val principal = SecurityContextHolder.getContext().authentication?.name
+            ?: throw IllegalArgumentException("User not authenticated")
+        return spreadService.approveSpread(id, comment, principal)
     }
 
     @PostMapping("/spread-items/{id}/reject")
     @PreAuthorize("hasAnyRole('CHECKER','MANAGER','ADMIN')")
     fun reject(@PathVariable id: UUID, @Valid @RequestBody request: Map<String, String>): SubmitSpreadResponse {
         val comment = request["comment"] ?: throw IllegalArgumentException("Comment is required")
-        val approverId = UUID.fromString(
-            SecurityContextHolder.getContext().authentication?.name ?: throw IllegalArgumentException("User not authenticated")
-        )
-        return spreadService.rejectSpread(id, comment, approverId)
+        val principal = SecurityContextHolder.getContext().authentication?.name
+            ?: throw IllegalArgumentException("User not authenticated")
+        return spreadService.rejectSpread(id, comment, principal)
     }
 
     @GetMapping("/spread-items/{id}/history")

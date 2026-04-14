@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import * as pdfjsLib from 'pdfjs-dist'
+import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2, Eye, EyeOff } from 'lucide-react'
 import { fetchApi } from '@/services/api'
 import { useSpreadStore } from '@/stores/spreadStore'
@@ -9,7 +9,15 @@ import { ZoneOverlay } from './ZoneOverlay'
 import { SourceHighlight } from './SourceHighlight'
 import type { BoundingBox, Zone } from '@/types/spread'
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+// Lazy-load pdfjs-dist to avoid SSR/webpack issues
+let pdfjsLib: typeof import('pdfjs-dist') | null = null
+const getPdfjs = async () => {
+  if (!pdfjsLib) {
+    pdfjsLib = await import('pdfjs-dist')
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+  }
+  return pdfjsLib
+}
 
 export interface PdfViewerProps {
   documentId?: string
@@ -61,7 +69,7 @@ export function PdfViewer({
   const [showZones, setShowZones] = useState(true)
   const [zones, setZones] = useState<Zone[]>([])
   const { highlightedSourcePage, highlightedSourceCoords } = useSpreadStore()
-  const pdfRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
+  const pdfRef = useRef<PDFDocumentProxy | null>(null)
   const effectiveUrl = documentUrl || (documentId ? `/api/documents/${documentId}/download` : '')
   const activePage = currentPage ?? pageNumber
 
@@ -104,7 +112,8 @@ export function PdfViewer({
     const loadPdf = async () => {
       try {
         setIsLoading(true)
-        const pdf = await pdfjsLib.getDocument(effectiveUrl).promise
+        const pdfjs = await getPdfjs()
+        const pdf = await pdfjs.getDocument(effectiveUrl).promise
         if (isMounted) {
           pdfRef.current = pdf
           setTotalPages(pdf.numPages)

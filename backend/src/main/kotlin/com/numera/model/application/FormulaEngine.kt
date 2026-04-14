@@ -49,7 +49,15 @@ class FormulaEngine {
                 ')' -> { tokens += Token(TokenType.RPAREN, ")"); i++ }
                 ',' -> { tokens += Token(TokenType.COMMA, ","); i++ }
                 ':' -> { tokens += Token(TokenType.COLON, ":"); i++ }
-                '=' -> { tokens += Token(TokenType.EQ, "="); i++ }
+                '=' -> {
+                    if (i + 1 < source.length && source[i + 1] == '=') {
+                        tokens += Token(TokenType.EQ, "==")
+                        i += 2
+                    } else {
+                        tokens += Token(TokenType.EQ, "=")
+                        i++
+                    }
+                }
                 '<' -> {
                     if (i + 1 < source.length && source[i + 1] == '=') {
                         tokens += Token(TokenType.LE, "<=")
@@ -103,9 +111,24 @@ class FormulaEngine {
         private var pos = 0
 
         fun parseExpression(): BigDecimal? {
-            val result = parseAddSub()
+            val left = parseAddSub()
+            val next = peek().type
+            if (next == TokenType.EQ || next == TokenType.LT || next == TokenType.GT || next == TokenType.LE || next == TokenType.GE) {
+                val op = advance().type
+                val right = parseAddSub()
+                expect(TokenType.EOF)
+                if (left == null || right == null) return null
+                return when (op) {
+                    TokenType.EQ -> left.subtract(right)
+                    TokenType.LT -> if (left < right) BigDecimal.ZERO else left.subtract(right)
+                    TokenType.GT -> if (left > right) BigDecimal.ZERO else right.subtract(left)
+                    TokenType.LE -> if (left <= right) BigDecimal.ZERO else left.subtract(right)
+                    TokenType.GE -> if (left >= right) BigDecimal.ZERO else right.subtract(left)
+                    else -> null
+                }
+            }
             expect(TokenType.EOF)
-            return result
+            return left
         }
 
         private fun parseAddSub(): BigDecimal? {
@@ -160,7 +183,15 @@ class FormulaEngine {
                     advance()
                     values[token.text]
                 }
-                TokenType.IDENT -> parseFunction()
+                TokenType.IDENT -> {
+                    // Check if it's a function call (followed by LPAREN) or a bare variable reference
+                    if (pos + 1 < tokens.size && tokens[pos + 1].type == TokenType.LPAREN) {
+                        parseFunction()
+                    } else {
+                        advance()
+                        values[token.text]
+                    }
+                }
                 TokenType.LPAREN -> {
                     advance()
                     val expr = parseAddSub()
