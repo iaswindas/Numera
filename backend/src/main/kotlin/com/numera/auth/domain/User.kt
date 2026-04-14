@@ -10,6 +10,8 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.JoinTable
 import jakarta.persistence.ManyToMany
 import jakarta.persistence.Table
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.time.Instant
 
 enum class AccountStatus {
@@ -31,6 +33,7 @@ class User : TenantAwareEntity() {
     @Column(name = "password_changed_at")
     var passwordChangedAt: Instant? = null
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "password_history", nullable = false, columnDefinition = "jsonb")
     var passwordHistory: String = "[]"
 

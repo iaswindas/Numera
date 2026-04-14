@@ -6,6 +6,8 @@ import jakarta.persistence.Entity
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(name = "spread_versions")
@@ -23,6 +25,7 @@ class SpreadVersion : BaseEntity() {
     @Column(columnDefinition = "text")
     var comments: String? = null
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
     var snapshotJson: String = "[]"
 

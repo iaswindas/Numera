@@ -11,6 +11,10 @@ import jakarta.persistence.Table
 import java.time.Instant
 import java.util.UUID
 
+enum class WaiverType {
+    INSTANCE, PERMANENT
+}
+
 /**
  * Persisted waiver letter generated for a covenant monitoring item.
  * Used for PDF generation and email delivery tracking.
@@ -25,7 +29,7 @@ class WaiverLetter : TenantAwareEntity() {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    var waiverType: String = "INSTANCE"  // INSTANCE or PERMANENT
+    var waiverType: WaiverType = WaiverType.INSTANCE
 
     @Column(nullable = false)
     var waived: Boolean = false

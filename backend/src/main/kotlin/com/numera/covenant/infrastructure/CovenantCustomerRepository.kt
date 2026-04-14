@@ -20,9 +20,9 @@ interface CovenantCustomerRepository : JpaRepository<CovenantCustomer, UUID> {
         """
         select cc from CovenantCustomer cc
         where cc.tenantId = :tenantId
-          and (:query is null
-               or lower(cc.customer.name) like lower(concat('%', :query, '%'))
-               or lower(cc.rimId) like lower(concat('%', :query, '%')))
+          and (cast(:query as string) is null
+               or lower(cc.customer.name) like lower(concat('%', cast(:query as string), '%'))
+               or lower(cc.rimId) like lower(concat('%', cast(:query as string), '%')))
         """
     )
     fun search(

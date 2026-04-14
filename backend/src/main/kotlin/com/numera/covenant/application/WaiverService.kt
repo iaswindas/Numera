@@ -2,6 +2,7 @@ package com.numera.covenant.application
 
 import com.numera.covenant.domain.CovenantStatus
 import com.numera.covenant.domain.WaiverLetter
+import com.numera.covenant.domain.WaiverType
 import com.numera.covenant.dto.WaiverGenerationRequest
 import com.numera.covenant.dto.WaiverLetterResponse
 import com.numera.covenant.dto.WaiverRequest
@@ -81,7 +82,7 @@ class WaiverService(
         val letter = WaiverLetter().also {
             it.tenantId = resolvedTenantId()
             it.monitoringItem = item
-            it.waiverType = request.waiverType
+            it.waiverType = WaiverType.valueOf(request.waiverType)
             it.waived = request.waived
             it.letterContent = letterContent
             it.templateId = request.templateId
@@ -275,7 +276,7 @@ class WaiverService(
     private fun WaiverLetter.toResponse() = WaiverLetterResponse(
         id = id!!,
         monitoringItemId = monitoringItem.id!!,
-        waiverType = waiverType,
+        waiverType = waiverType.name,
         waived = waived,
         letterContent = letterContent,
         comments = comments,

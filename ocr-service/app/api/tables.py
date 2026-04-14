@@ -54,7 +54,7 @@ async def detect_tables(request: TableDetectRequest, http_request: Request):
     if storage is None:
         raise HTTPException(status_code=502, detail="Storage subsystem unavailable")
     try:
-        pdf_bytes = storage.download(request.storage_path)
+        pdf_bytes = await storage.download(request.storage_path)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"File not found: {request.storage_path}")
     except Exception as exc:

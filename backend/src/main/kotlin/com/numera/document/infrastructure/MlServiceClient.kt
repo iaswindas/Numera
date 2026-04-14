@@ -17,10 +17,12 @@ class MlServiceClient(
 ) {
     private val ocrClient = webClientBuilder
         .baseUrl(config.ml.ocrServiceUrl)
+        .defaultHeader("X-API-Key", config.ml.ocrApiKey)
         .build()
 
     private val mlClient = webClientBuilder
         .baseUrl(config.ml.mlServiceUrl)
+        .defaultHeader("X-API-Key", config.ml.mlApiKey)
         .build()
 
     private val circuits = ConcurrentHashMap<String, CircuitState>()
@@ -47,6 +49,7 @@ class MlServiceClient(
         val backend: String,
         val pdf_type: String,
         val pages_failed: Int = 0,
+        val errors: List<Map<String, Any>> = emptyList(),
     )
 
     fun extractText(
@@ -56,7 +59,7 @@ class MlServiceClient(
         password: String? = null,
     ): OcrResponse =
         executeWithResilience("ocr") {
-            ocrClient.post().uri("ocr/extract")
+            ocrClient.post().uri("/ocr/extract")
                 .bodyValue(OcrRequest(documentId, storagePath, language, password))
                 .retrieve().bodyToMono(OcrResponse::class.java)
                 .withMlResilience("ocr.extractText")
@@ -77,11 +80,12 @@ class MlServiceClient(
         val backend: String,
         val pdf_type: String,
         val tables_filtered: Int = 0,
+        val errors: List<Map<String, Any>> = emptyList(),
     )
 
     fun detectTables(documentId: String, storagePath: String, password: String? = null): TableDetectResponse =
         executeWithResilience("ocr") {
-            ocrClient.post().uri("ocr/tables/detect")
+            ocrClient.post().uri("/ocr/tables/detect")
                 .bodyValue(TableDetectRequest(documentId, storagePath, password))
                 .retrieve().bodyToMono(TableDetectResponse::class.java)
                 .withMlResilience("ocr.detectTables")
@@ -126,7 +130,7 @@ class MlServiceClient(
 
     fun predictCovenantBreach(request: CovenantPredictionRequest): CovenantPredictionResponse =
         executeWithResilience("ml") {
-            mlClient.post().uri("ml/covenant/predict")
+            mlClient.post().uri("/ml/covenant/predict")
                 .bodyValue(request)
                 .retrieve().bodyToMono(CovenantPredictionResponse::class.java)
                 .withMlResilience("ml.predictCovenantBreach")
@@ -153,7 +157,7 @@ class MlServiceClient(
 
     fun classifyZones(documentId: String, tables: List<Map<String, Any>>): ZoneClassifyResponse =
         executeWithResilience("ml") {
-            mlClient.post().uri("ml/zones/classify")
+            mlClient.post().uri("/ml/zones/classify")
                 .bodyValue(ZoneClassifyRequest(documentId, tables))
                 .retrieve().bodyToMono(ZoneClassifyResponse::class.java)
                 .withMlResilience("ml.classifyZones")
@@ -176,7 +180,7 @@ class MlServiceClient(
 
     fun suggestMappings(request: MappingSuggestRequest): MappingSuggestResponse =
         executeWithResilience("ml") {
-            mlClient.post().uri("ml/mapping/suggest")
+            mlClient.post().uri("/ml/mapping/suggest")
                 .bodyValue(request)
                 .retrieve().bodyToMono(MappingSuggestResponse::class.java)
                 .withMlResilience("ml.suggestMappings")
@@ -242,7 +246,7 @@ class MlServiceClient(
 
     fun buildExpressions(request: ExpressionBuildRequest): ExpressionBuildResponse {
         val response = executeWithResilience("ml") {
-            mlClient.post().uri("ml/expressions/build")
+            mlClient.post().uri("/ml/expressions/build")
                 .bodyValue(request)
                 .retrieve().bodyToMono(ExpressionBuildRawResponse::class.java)
                 .withMlResilience("ml.buildExpressions")
@@ -303,7 +307,7 @@ class MlServiceClient(
 
     fun submitFeedback(corrections: List<FeedbackItem>): FeedbackResponse =
         executeWithResilience("ml") {
-            mlClient.post().uri("ml/feedback")
+            mlClient.post().uri("/ml/feedback")
                 .bodyValue(FeedbackRequest(corrections))
                 .retrieve().bodyToMono(FeedbackResponse::class.java)
                 .withMlResilience("ml.submitFeedback")
@@ -347,7 +351,7 @@ class MlServiceClient(
 
     fun predictCovenantBreachRSBSN(request: RSBSNPredictionRequest): RSBSNPredictionResponse =
         executeWithResilience("ml") {
-            mlClient.post().uri("ml/covenants/predict")
+            mlClient.post().uri("/ml/covenants/predict")
                 .bodyValue(request)
                 .retrieve().bodyToMono(RSBSNPredictionResponse::class.java)
                 .withMlResilience("ml.predictCovenantBreachRSBSN")
@@ -388,7 +392,7 @@ class MlServiceClient(
 
     fun detectAnomalies(request: AnomalyDetectionRequest): AnomalyDetectionResponse =
         executeWithResilience("ml") {
-            mlClient.post().uri("ml/anomaly/detect")
+            mlClient.post().uri("/ml/anomaly/detect")
                 .bodyValue(request)
                 .retrieve().bodyToMono(AnomalyDetectionResponse::class.java)
                 .withMlResilience("ml.detectAnomalies")

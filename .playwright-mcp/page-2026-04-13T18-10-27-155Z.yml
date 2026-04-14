@@ -1,0 +1,184 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e36]:
+    - complementary [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e39]: "N"
+        - generic [ref=e40]: Numera
+      - generic [ref=e41]:
+        - generic [ref=e42]: Main
+        - link "Dashboard" [ref=e43] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e44]
+          - generic [ref=e49]: Dashboard
+      - generic [ref=e50]:
+        - generic [ref=e51]: Spreading
+        - link "Search Customer" [ref=e52] [cursor=pointer]:
+          - /url: /customers
+          - img [ref=e53]
+          - generic [ref=e56]: Search Customer
+        - link "File Store" [ref=e57] [cursor=pointer]:
+          - /url: /documents
+          - img [ref=e58]
+          - generic [ref=e61]: File Store
+      - generic [ref=e62]:
+        - generic [ref=e63]: Approvals
+        - link "Pending Approvals" [ref=e64] [cursor=pointer]:
+          - /url: /approvals
+          - img [ref=e65]
+          - generic [ref=e68]: Pending Approvals
+      - generic [ref=e69]:
+        - generic [ref=e70]: Covenants
+        - link "Covenant Mgmt 3" [ref=e71] [cursor=pointer]:
+          - /url: /covenants/management
+          - img [ref=e72]
+          - generic [ref=e74]: Covenant Mgmt
+          - generic [ref=e75]: "3"
+        - link "Covenant Items" [ref=e76] [cursor=pointer]:
+          - /url: /covenants
+          - img [ref=e77]
+          - generic [ref=e80]: Covenant Items
+        - link "Intelligence" [ref=e81] [cursor=pointer]:
+          - /url: /covenant-intelligence
+          - img [ref=e82]
+          - generic [ref=e84]: Intelligence
+        - link "Formula Mgmt" [ref=e85] [cursor=pointer]:
+          - /url: /admin/formulas
+          - img [ref=e86]
+          - generic [ref=e88]: Formula Mgmt
+        - link "Email Templates" [ref=e89] [cursor=pointer]:
+          - /url: /email-templates
+          - img [ref=e90]
+          - generic [ref=e93]: Email Templates
+      - generic [ref=e94]:
+        - generic [ref=e95]: Analytics
+        - link "Portfolio Analytics" [ref=e96] [cursor=pointer]:
+          - /url: /portfolio
+          - img [ref=e97]
+          - generic [ref=e99]: Portfolio Analytics
+        - link "Reports & MIS" [ref=e100] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e101]
+          - generic [ref=e103]: Reports & MIS
+      - generic [ref=e104]:
+        - generic [ref=e105]: Admin
+        - link "User Management" [ref=e106] [cursor=pointer]:
+          - /url: /admin/users
+          - img [ref=e107]
+          - generic [ref=e112]: User Management
+        - link "Languages" [ref=e113] [cursor=pointer]:
+          - /url: /admin/languages
+          - img [ref=e114]
+          - generic [ref=e118]: Languages
+        - link "Taxonomy & Zones" [ref=e119] [cursor=pointer]:
+          - /url: /admin/taxonomy
+          - img [ref=e120]
+          - generic [ref=e122]: Taxonomy & Zones
+        - link "Workflow Designer" [ref=e123] [cursor=pointer]:
+          - /url: /admin/workflows
+          - img [ref=e124]
+          - generic [ref=e128]: Workflow Designer
+      - generic [ref=e129]:
+        - link "Settings" [ref=e130] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e131]
+          - generic [ref=e134]: Settings
+        - generic [ref=e135]:
+          - generic [ref=e136]: JD
+          - generic [ref=e137]:
+            - generic [ref=e138]: John Doe
+            - generic [ref=e139]: Analyst
+    - generic [ref=e140]:
+      - banner [ref=e141]:
+        - generic [ref=e144]: Dashboard
+        - generic [ref=e145]:
+          - generic [ref=e146]:
+            - img [ref=e147]
+            - textbox "Search anything..." [ref=e150]
+          - img [ref=e152] [cursor=pointer]
+          - generic [ref=e156]: JD
+      - generic [ref=e157]:
+        - generic [ref=e158]:
+          - heading "Dashboard" [level=1] [ref=e159]
+          - paragraph [ref=e160]: Overview of your spreading and covenant activities
+        - generic [ref=e161]:
+          - generic [ref=e162]:
+            - generic [ref=e163]:
+              - img [ref=e164]
+              - text: Total Spreads
+            - generic [ref=e167]: "0"
+            - generic [ref=e168]:
+              - img [ref=e169]
+              - text: Live portfolio count
+          - generic [ref=e172]:
+            - generic [ref=e173]:
+              - img [ref=e174]
+              - text: AI Accuracy
+            - generic [ref=e176]: 0.00%
+            - generic [ref=e177]:
+              - img [ref=e178]
+              - text: Calculated from mapped values
+          - generic [ref=e181]:
+            - generic [ref=e182]:
+              - img [ref=e183]
+              - text: Avg Processing Time
+            - generic [ref=e186]: 0s
+            - generic [ref=e187]:
+              - img [ref=e188]
+              - text: Document processing average
+          - generic [ref=e191]:
+            - generic [ref=e192]:
+              - img [ref=e193]
+              - text: Covenants at Risk
+            - generic [ref=e197]: "0"
+            - generic [ref=e198]:
+              - img [ref=e199]
+              - text: Breached monitoring items
+          - generic [ref=e202]:
+            - generic [ref=e203]:
+              - img [ref=e204]
+              - text: Active Customers
+            - generic [ref=e206]: "0"
+            - generic [ref=e207]:
+              - img [ref=e208]
+              - text: Current customer records
+        - generic [ref=e211]:
+          - generic [ref=e212]:
+            - generic [ref=e214]:
+              - generic [ref=e215]: Spreads Processed
+              - generic [ref=e216]: Monthly trend over last 7 months
+            - application [ref=e219]:
+              - generic [ref=e220]:
+                - generic [ref=e221]:
+                  - generic [ref=e223]: 2025-12
+                  - generic [ref=e225]: 2026-04
+                - generic [ref=e226]:
+                  - generic [ref=e228]: "0"
+                  - generic [ref=e230]: "1"
+                  - generic [ref=e232]: "2"
+                  - generic [ref=e234]: "3"
+                  - generic [ref=e236]: "4"
+          - generic [ref=e237]:
+            - generic [ref=e239]:
+              - generic [ref=e240]: Covenant Status Distribution
+              - generic [ref=e241]: From monitoring summary endpoint
+            - application [ref=e245]
+        - generic [ref=e246]:
+          - generic [ref=e247]:
+            - generic [ref=e248]: Recent Spreads
+            - link "View All" [ref=e249] [cursor=pointer]:
+              - /url: /customers
+              - text: View All
+              - img [ref=e250]
+          - table [ref=e252]:
+            - rowgroup [ref=e253]:
+              - row "Customer Date Status AI Accuracy Processing Time" [ref=e254]:
+                - columnheader "Customer" [ref=e255]
+                - columnheader "Date" [ref=e256]
+                - columnheader "Status" [ref=e257]
+                - columnheader "AI Accuracy" [ref=e258]
+                - columnheader "Processing Time" [ref=e259]
+            - rowgroup
+  - button "Open Next.js Dev Tools" [ref=e265] [cursor=pointer]:
+    - img [ref=e266]
+  - alert [ref=e269]
+  - generic [ref=e270]: "0"

@@ -36,7 +36,7 @@ export default function CustomerItemsPage() {
           </p>
         </div>
         <div style={{ flex: 1 }} />
-        <button className="btn btn-primary"><Plus size={16} />Add Item</button>
+        <Link href={`/documents?customerId=${customerId}`} className="btn btn-primary"><Plus size={16} />Add Item</Link>
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>

@@ -26,6 +26,10 @@ class ModelManager:
         try:
             import mlflow
             mlflow.set_tracking_uri(mlflow_uri)
+            # Quick connectivity check — fail fast if MLflow is unreachable
+            import urllib.request
+            req = urllib.request.Request(f"{mlflow_uri}/api/2.0/mlflow/experiments/list?max_results=1")
+            urllib.request.urlopen(req, timeout=3)
             self._mlflow_available = True
             logger.info("MLflow client connected to %s", mlflow_uri)
         except Exception as exc:

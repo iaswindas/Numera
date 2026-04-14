@@ -32,6 +32,8 @@ data class NumeraProperties(
     data class Ml(
         val ocrServiceUrl: String = "http://localhost:8001/api",
         val mlServiceUrl: String = "http://localhost:8002/api",
+        val ocrApiKey: String = "",
+        val mlApiKey: String = "",
         val timeoutMs: Long = 120000,
         val retryMaxAttempts: Int = 3,
         val retryBackoffMs: Long = 500,

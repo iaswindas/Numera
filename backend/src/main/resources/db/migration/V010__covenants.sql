@@ -24,7 +24,8 @@ CREATE TABLE covenant_contacts (
     user_id                 UUID REFERENCES users(id),
     name                    VARCHAR(255) NOT NULL,
     email                   VARCHAR(255) NOT NULL,
-    created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Covenant definitions — both financial and non-financial
@@ -87,7 +88,9 @@ CREATE TABLE covenant_documents (
     file_size           BIGINT,
     content_type        VARCHAR(200),
     uploaded_by         UUID REFERENCES users(id),
-    uploaded_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    uploaded_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Email / letter templates for covenant notifications

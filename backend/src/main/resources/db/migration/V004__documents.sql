@@ -19,7 +19,7 @@ CREATE TABLE detected_zones (
     table_id VARCHAR(120) NOT NULL,
     zone_type VARCHAR(80) NOT NULL,
     zone_label VARCHAR(255),
-    confidence NUMERIC(8,4),
+    confidence DOUBLE PRECISION,
     page_number INT,
     metadata_json JSONB,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

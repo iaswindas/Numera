@@ -28,6 +28,7 @@ CREATE TABLE sync_records (
     idempotency_key     VARCHAR(255) NOT NULL,
     retry_count         INT         NOT NULL DEFAULT 0,
     max_retries         INT         NOT NULL DEFAULT 3,
+    next_retry_at       TIMESTAMPTZ,
     last_error          TEXT,
     synced_at           TIMESTAMPTZ,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),

@@ -63,9 +63,17 @@ class StorageClient:
         if self._s3_client is None:
             raise RuntimeError("MinIO client not initialised and no local fallback configured")
 
+        bucket = self._bucket
+        object_key = path
+        if "/" in path:
+            bucket_prefix, remainder = path.split("/", 1)
+            if bucket_prefix and remainder:
+                bucket = bucket_prefix
+                object_key = remainder
+
         try:
             response = self._s3_client.get_object(
-                Bucket=self._bucket, Key=path
+                Bucket=bucket, Key=object_key
             )
             body = response["Body"]
             try:

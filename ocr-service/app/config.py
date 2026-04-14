@@ -18,7 +18,7 @@ class OcrSettings(BaseSettings):
     minio_endpoint: str = "localhost:9000"
     minio_access_key: str = ""
     minio_secret_key: str = ""
-    minio_bucket: str = "numera-documents"
+    minio_bucket: str = "numera-docs"
     minio_secure: bool = False
 
     # --- Processor backend ---

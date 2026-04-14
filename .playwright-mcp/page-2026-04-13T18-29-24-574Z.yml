@@ -1,0 +1,141 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e46]:
+    - complementary [ref=e47]:
+      - generic [ref=e48]:
+        - generic [ref=e49]: "N"
+        - generic [ref=e50]: Numera
+      - generic [ref=e51]:
+        - generic [ref=e52]: Main
+        - link "Dashboard" [ref=e53] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e54]
+          - generic [ref=e59]: Dashboard
+      - generic [ref=e60]:
+        - generic [ref=e61]: Spreading
+        - link "Search Customer" [ref=e62] [cursor=pointer]:
+          - /url: /customers
+          - img [ref=e63]
+          - generic [ref=e66]: Search Customer
+        - link "File Store" [ref=e67] [cursor=pointer]:
+          - /url: /documents
+          - img [ref=e68]
+          - generic [ref=e71]: File Store
+      - generic [ref=e72]:
+        - generic [ref=e73]: Approvals
+        - link "Pending Approvals" [ref=e74] [cursor=pointer]:
+          - /url: /approvals
+          - img [ref=e75]
+          - generic [ref=e78]: Pending Approvals
+      - generic [ref=e79]:
+        - generic [ref=e80]: Covenants
+        - link "Covenant Mgmt 3" [ref=e81] [cursor=pointer]:
+          - /url: /covenants/management
+          - img [ref=e82]
+          - generic [ref=e84]: Covenant Mgmt
+          - generic [ref=e85]: "3"
+        - link "Covenant Items" [ref=e86] [cursor=pointer]:
+          - /url: /covenants
+          - img [ref=e87]
+          - generic [ref=e90]: Covenant Items
+        - link "Intelligence" [ref=e91] [cursor=pointer]:
+          - /url: /covenant-intelligence
+          - img [ref=e92]
+          - generic [ref=e94]: Intelligence
+        - link "Formula Mgmt" [ref=e95] [cursor=pointer]:
+          - /url: /admin/formulas
+          - img [ref=e96]
+          - generic [ref=e98]: Formula Mgmt
+        - link "Email Templates" [ref=e99] [cursor=pointer]:
+          - /url: /email-templates
+          - img [ref=e100]
+          - generic [ref=e103]: Email Templates
+      - generic [ref=e104]:
+        - generic [ref=e105]: Analytics
+        - link "Portfolio Analytics" [ref=e106] [cursor=pointer]:
+          - /url: /portfolio
+          - img [ref=e107]
+          - generic [ref=e109]: Portfolio Analytics
+        - link "Reports & MIS" [ref=e110] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e111]
+          - generic [ref=e113]: Reports & MIS
+      - generic [ref=e114]:
+        - generic [ref=e115]: Admin
+        - link "User Management" [ref=e116] [cursor=pointer]:
+          - /url: /admin/users
+          - img [ref=e117]
+          - generic [ref=e122]: User Management
+        - link "Languages" [ref=e123] [cursor=pointer]:
+          - /url: /admin/languages
+          - img [ref=e124]
+          - generic [ref=e128]: Languages
+        - link "Taxonomy & Zones" [ref=e129] [cursor=pointer]:
+          - /url: /admin/taxonomy
+          - img [ref=e130]
+          - generic [ref=e132]: Taxonomy & Zones
+        - link "Workflow Designer" [ref=e133] [cursor=pointer]:
+          - /url: /admin/workflows
+          - img [ref=e134]
+          - generic [ref=e138]: Workflow Designer
+      - generic [ref=e139]:
+        - link "Settings" [ref=e140] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e141]
+          - generic [ref=e144]: Settings
+        - generic [ref=e145]:
+          - generic [ref=e146]: JD
+          - generic [ref=e147]:
+            - generic [ref=e148]: John Doe
+            - generic [ref=e149]: Analyst
+    - generic [ref=e150]:
+      - banner [ref=e151]:
+        - generic [ref=e152]:
+          - generic [ref=e154]: Spreading
+          - generic [ref=e273]:
+            - img [ref=e274]
+            - generic [ref=e276]: File Store
+        - generic [ref=e155]:
+          - generic [ref=e156]:
+            - img [ref=e157]
+            - textbox "Search anything..." [ref=e160]
+          - img [ref=e162] [cursor=pointer]
+          - generic [ref=e166]: JD
+      - generic [ref=e167]:
+        - generic [ref=e346]:
+          - heading "File Store" [level=1] [ref=e347]
+          - paragraph [ref=e348]: Upload and manage financial documents for AI processing
+        - generic [ref=e349]:
+          - generic [ref=e350]:
+            - generic [ref=e351]:
+              - img [ref=e352]
+              - textbox "Search files..." [ref=e355]
+            - combobox [ref=e356] [cursor=pointer]:
+              - option "Select customer" [selected]
+              - option "Acme Industries LLC"
+            - combobox [ref=e357] [cursor=pointer]:
+              - option "English" [selected]
+              - option "Arabic"
+          - button "Upload Files" [ref=e359] [cursor=pointer]:
+            - img [ref=e360]
+            - text: Upload Files
+        - generic [ref=e363]:
+          - button "My Files" [ref=e364] [cursor=pointer]
+          - button "All Files" [ref=e365] [cursor=pointer]
+          - button "Error Files" [ref=e366] [cursor=pointer]
+        - table [ref=e368]:
+          - rowgroup [ref=e369]:
+            - row "File Name Language Status Uploaded By Uploaded At Zones Actions" [ref=e370]:
+              - columnheader "File Name" [ref=e371]
+              - columnheader "Language" [ref=e372]
+              - columnheader "Status" [ref=e373]
+              - columnheader "Uploaded By" [ref=e374]
+              - columnheader "Uploaded At" [ref=e375]
+              - columnheader "Zones" [ref=e376]
+              - columnheader "Actions" [ref=e377]
+          - rowgroup [ref=e378]:
+            - row "No documents found." [ref=e379]:
+              - cell "No documents found." [ref=e380]
+  - button "Open Next.js Dev Tools" [ref=e42] [cursor=pointer]:
+    - img [ref=e43]
+  - alert [ref=e2]
+  - generic [ref=e272]: "0"

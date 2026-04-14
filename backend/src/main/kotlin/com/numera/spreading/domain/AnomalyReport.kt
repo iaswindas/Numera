@@ -4,6 +4,8 @@ import com.numera.shared.domain.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.stereotype.Repository
 import java.math.BigDecimal
@@ -22,6 +24,7 @@ class AnomalyReport : BaseEntity() {
     @Column(nullable = false, columnDefinition = "text")
     var summary: String = ""
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "anomalies_json", nullable = false, columnDefinition = "jsonb")
     var anomaliesJson: String = "[]"
 

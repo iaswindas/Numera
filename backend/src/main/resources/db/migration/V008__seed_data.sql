@@ -8,5 +8,5 @@ VALUES ('00000000-0000-0000-0000-000000000001', 'ROLE_ADMIN'),
 ON CONFLICT DO NOTHING;
 
 INSERT INTO users (tenant_id, email, password_hash, full_name, enabled)
-VALUES ('00000000-0000-0000-0000-000000000001', 'admin@numera.ai', '$2a$10$4Zo1KCU8dVS6x6fM2Q7WfO4VhDhXfYim0s6mMTR9AZxM1n1Hh6M6S', 'Demo Admin', true)
+VALUES ('00000000-0000-0000-0000-000000000001', 'admin@numera.ai', '$2b$10$8jDkifrsjqn6xGY2Y1wx8eVw28Gi0oyv6Skfi.an7qd0WxLhcbfn6', 'Demo Admin', true)
 ON CONFLICT DO NOTHING;

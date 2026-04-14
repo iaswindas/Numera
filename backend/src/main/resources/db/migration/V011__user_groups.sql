@@ -21,6 +21,7 @@ CREATE TABLE group_members (
     group_id    UUID NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
     user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (group_id, user_id)
 );
 
@@ -30,6 +31,7 @@ CREATE TABLE group_customer_access (
     group_id    UUID NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
     customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (group_id, customer_id)
 );
 

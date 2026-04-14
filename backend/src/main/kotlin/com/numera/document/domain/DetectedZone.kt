@@ -6,6 +6,8 @@ import jakarta.persistence.Entity
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(name = "detected_zones")
@@ -29,6 +31,7 @@ class DetectedZone : BaseEntity() {
     @Column
     var pageNumber: Int? = null
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     var metadataJson: String? = null
 }

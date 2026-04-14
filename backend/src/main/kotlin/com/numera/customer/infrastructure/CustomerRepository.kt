@@ -18,9 +18,9 @@ interface CustomerRepository : JpaRepository<Customer, UUID> {
         """
         select c from Customer c
         where c.tenantId = :tenantId
-          and (:query is null or lower(c.name) like lower(concat('%', :query, '%')) or lower(c.customerCode) like lower(concat('%', :query, '%')))
-          and (:industry is null or c.industry = :industry)
-          and (:country is null or c.country = :country)
+          and (cast(:query as string) is null or lower(c.name) like lower(concat('%', cast(:query as string), '%')) or lower(c.customerCode) like lower(concat('%', cast(:query as string), '%')))
+          and (cast(:industry as string) is null or c.industry = :industry)
+          and (cast(:country as string) is null or c.country = :country)
         """
     )
     fun search(
@@ -35,9 +35,9 @@ interface CustomerRepository : JpaRepository<Customer, UUID> {
         select c from Customer c
         where c.tenantId = :tenantId
           and c.id in :customerIds
-          and (:query is null or lower(c.name) like lower(concat('%', :query, '%')) or lower(c.customerCode) like lower(concat('%', :query, '%')))
-          and (:industry is null or c.industry = :industry)
-          and (:country is null or c.country = :country)
+          and (cast(:query as string) is null or lower(c.name) like lower(concat('%', cast(:query as string), '%')) or lower(c.customerCode) like lower(concat('%', cast(:query as string), '%')))
+          and (cast(:industry as string) is null or c.industry = :industry)
+          and (cast(:country as string) is null or c.country = :country)
         """
     )
     fun searchWithVisibility(

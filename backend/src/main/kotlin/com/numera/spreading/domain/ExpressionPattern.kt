@@ -8,6 +8,8 @@ import jakarta.persistence.Entity
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.time.Instant
 
 @Entity
@@ -27,6 +29,7 @@ class ExpressionPattern : TenantAwareEntity() {
     @Column(nullable = false)
     var patternType: String = "EXPRESSION"
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
     var patternJson: String = "{}"
 

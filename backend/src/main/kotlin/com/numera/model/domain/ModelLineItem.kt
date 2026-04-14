@@ -8,6 +8,8 @@ import jakarta.persistence.Enumerated
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(name = "model_line_items")
@@ -47,6 +49,7 @@ class ModelLineItem : BaseEntity() {
     @Column(nullable = false)
     var signConvention: String = "NATURAL"
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     var aliasesJson: String? = null
 
