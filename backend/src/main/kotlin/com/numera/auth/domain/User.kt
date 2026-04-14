@@ -12,6 +12,7 @@ import jakarta.persistence.ManyToMany
 import jakarta.persistence.Table
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
+import org.hibernate.annotations.ColumnTransformer
 import java.time.Instant
 
 enum class AccountStatus {
@@ -35,6 +36,7 @@ class User : TenantAwareEntity() {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "password_history", nullable = false, columnDefinition = "jsonb")
+    @ColumnTransformer(write = "?::jsonb")
     var passwordHistory: String = "[]"
 
     @Column(nullable = false)

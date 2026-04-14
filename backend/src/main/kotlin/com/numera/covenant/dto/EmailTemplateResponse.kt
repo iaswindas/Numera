@@ -1,5 +1,7 @@
 package com.numera.covenant.dto
 
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Size
 import java.time.Instant
 import java.util.UUID
 
@@ -15,9 +17,9 @@ data class EmailTemplateResponse(
 )
 
 data class SignatureRequest(
-    val name: String,
-    val title: String? = null,
-    val htmlContent: String,
+    @field:NotBlank @field:Size(max = 200) val name: String,
+    @field:Size(max = 200) val title: String? = null,
+    @field:NotBlank val htmlContent: String,
 )
 
 data class SignatureResponse(

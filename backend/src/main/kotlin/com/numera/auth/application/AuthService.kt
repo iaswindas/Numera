@@ -164,10 +164,13 @@ class AuthService(
     private fun String.toApiRole(): String = removePrefix("ROLE_")
 
     @Transactional
-    fun logout(email: String) {
+    fun logout(email: String, accessToken: String? = null) {
         val user = userRepository.findByEmailIgnoreCase(email)
             .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "User not found") }
         refreshTokenRepository.revokeAllByUserId(user.id!!)
+        if (accessToken != null) {
+            tokenProvider.blacklistToken(accessToken)
+        }
     }
 
     @Transactional

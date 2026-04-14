@@ -2,6 +2,7 @@ package com.numera.spreading.domain
 
 import com.numera.shared.domain.BaseEntity
 import jakarta.persistence.Column
+import org.hibernate.annotations.ColumnTransformer
 import jakarta.persistence.Entity
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
@@ -27,6 +28,7 @@ class SpreadVersion : BaseEntity() {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
+    @ColumnTransformer(write = "?::jsonb")
     var snapshotJson: String = "[]"
 
     @Column(nullable = false)

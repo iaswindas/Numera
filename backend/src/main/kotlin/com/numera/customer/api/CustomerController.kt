@@ -7,6 +7,10 @@ import com.numera.customer.dto.CustomerSearchRequest
 import com.numera.shared.domain.TenantAwareEntity
 import com.numera.shared.security.TenantContext
 import jakarta.validation.Valid
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Sort
+import org.springframework.data.web.PageableDefault
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -33,7 +37,9 @@ class CustomerController(
         @RequestParam(required = false) query: String?,
         @RequestParam(required = false) industry: String?,
         @RequestParam(required = false) country: String?,
-    ): List<CustomerResponse> = customerService.search(resolvedTenantId(), CustomerSearchRequest(query, industry, country))
+        @PageableDefault(size = 20, sort = ["createdAt"], direction = Sort.Direction.DESC)
+        pageable: Pageable,
+    ): Page<CustomerResponse> = customerService.search(resolvedTenantId(), CustomerSearchRequest(query, industry, country), pageable)
 
     @GetMapping("/{id}")
     fun get(@PathVariable id: UUID): CustomerResponse = customerService.findById(id)

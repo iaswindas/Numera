@@ -26,31 +26,31 @@ class OcrPreprocessOverrides(BaseModel):
 
 
 class OcrRequest(BaseModel):
-    document_id: str
-    storage_path: str
-    language: str = "en"
-    pages: list[int] | None = None
-    password: str | None = None
+    document_id: str = Field(..., max_length=100)
+    storage_path: str = Field(..., max_length=500)
+    language: str = Field("en", max_length=10)
+    pages: list[int] | None = Field(None, max_length=500)
+    password: str | None = Field(None, max_length=200)
     preprocess: OcrPreprocessOverrides | None = None
 
 
 class OcrTextBlock(BaseModel):
-    text: str
-    confidence: float
-    bbox: list[float]
-    page: int
+    text: str = Field(..., max_length=100000)
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    bbox: list[float] = Field(..., max_length=8)
+    page: int = Field(..., ge=0)
 
 
 class OcrResponse(BaseModel):
-    document_id: str
-    total_pages: int
-    pages_processed: int
-    pages_failed: int
+    document_id: str = Field(..., max_length=100)
+    total_pages: int = Field(..., ge=0)
+    pages_processed: int = Field(..., ge=0)
+    pages_failed: int = Field(..., ge=0)
     text_blocks: list[OcrTextBlock]
     full_text: str
-    processing_time_ms: int
-    backend: str = "native"  # "native", "qwen3vl", "paddleocr"
-    pdf_type: str = "native"  # "native", "scanned", "mixed"
+    processing_time_ms: int = Field(..., ge=0)
+    backend: str = Field("native", max_length=50)
+    pdf_type: str = Field("native", max_length=50)
     errors: list[MLError] = Field(default_factory=list)
 
 

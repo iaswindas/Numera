@@ -1,0 +1,220 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e48]:
+    - complementary [ref=e49]:
+      - generic [ref=e50]:
+        - generic [ref=e51]: "N"
+        - generic [ref=e52]: Numera
+      - generic [ref=e53]:
+        - generic [ref=e54]: Main
+        - link "Dashboard" [ref=e55] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e56]
+          - generic [ref=e61]: Dashboard
+      - generic [ref=e62]:
+        - generic [ref=e63]: Spreading
+        - link "Search Customer" [ref=e64] [cursor=pointer]:
+          - /url: /customers
+          - img [ref=e65]
+          - generic [ref=e68]: Search Customer
+        - link "File Store" [ref=e69] [cursor=pointer]:
+          - /url: /documents
+          - img [ref=e70]
+          - generic [ref=e73]: File Store
+      - generic [ref=e74]:
+        - generic [ref=e75]: Approvals
+        - link "Pending Approvals" [ref=e76] [cursor=pointer]:
+          - /url: /approvals
+          - img [ref=e77]
+          - generic [ref=e80]: Pending Approvals
+      - generic [ref=e81]:
+        - generic [ref=e82]: Covenants
+        - link "Covenant Mgmt 3" [ref=e83] [cursor=pointer]:
+          - /url: /covenants/management
+          - img [ref=e84]
+          - generic [ref=e86]: Covenant Mgmt
+          - generic [ref=e87]: "3"
+        - link "Covenant Items" [ref=e88] [cursor=pointer]:
+          - /url: /covenants
+          - img [ref=e89]
+          - generic [ref=e92]: Covenant Items
+        - link "Intelligence" [ref=e93] [cursor=pointer]:
+          - /url: /covenant-intelligence
+          - img [ref=e94]
+          - generic [ref=e96]: Intelligence
+        - link "Formula Mgmt" [ref=e97] [cursor=pointer]:
+          - /url: /admin/formulas
+          - img [ref=e98]
+          - generic [ref=e100]: Formula Mgmt
+        - link "Email Templates" [ref=e101] [cursor=pointer]:
+          - /url: /email-templates
+          - img [ref=e102]
+          - generic [ref=e105]: Email Templates
+      - generic [ref=e106]:
+        - generic [ref=e107]: Analytics
+        - link "Portfolio Analytics" [ref=e108] [cursor=pointer]:
+          - /url: /portfolio
+          - img [ref=e109]
+          - generic [ref=e111]: Portfolio Analytics
+        - link "Reports & MIS" [ref=e112] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e113]
+          - generic [ref=e115]: Reports & MIS
+      - generic [ref=e116]:
+        - generic [ref=e117]: Admin
+        - link "User Management" [ref=e118] [cursor=pointer]:
+          - /url: /admin/users
+          - img [ref=e119]
+          - generic [ref=e124]: User Management
+        - link "Languages" [ref=e125] [cursor=pointer]:
+          - /url: /admin/languages
+          - img [ref=e126]
+          - generic [ref=e130]: Languages
+        - link "Taxonomy & Zones" [ref=e131] [cursor=pointer]:
+          - /url: /admin/taxonomy
+          - img [ref=e132]
+          - generic [ref=e134]: Taxonomy & Zones
+        - link "Workflow Designer" [ref=e135] [cursor=pointer]:
+          - /url: /admin/workflows
+          - img [ref=e136]
+          - generic [ref=e140]: Workflow Designer
+      - generic [ref=e141]:
+        - link "Settings" [ref=e142] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e143]
+          - generic [ref=e146]: Settings
+        - generic [ref=e147]:
+          - generic [ref=e148]: JD
+          - generic [ref=e149]:
+            - generic [ref=e150]: John Doe
+            - generic [ref=e151]: Analyst
+    - generic [ref=e152]:
+      - banner [ref=e153]:
+        - generic [ref=e156]: Dashboard
+        - generic [ref=e157]:
+          - generic [ref=e158]:
+            - img [ref=e159]
+            - textbox "Search anything..." [ref=e162]
+          - img [ref=e164] [cursor=pointer]
+          - generic [ref=e168]: JD
+      - generic [ref=e169]:
+        - generic [ref=e170]:
+          - heading "Dashboard" [level=1] [ref=e171]
+          - paragraph [ref=e172]: Overview of your spreading and covenant activities
+        - generic [ref=e173]:
+          - generic [ref=e174]:
+            - generic [ref=e175]:
+              - img [ref=e176]
+              - text: Total Spreads
+            - generic [ref=e179]: "5"
+            - generic [ref=e180]:
+              - img [ref=e181]
+              - text: Live portfolio count
+          - generic [ref=e184]:
+            - generic [ref=e185]:
+              - img [ref=e186]
+              - text: AI Accuracy
+            - generic [ref=e188]: 0.75%
+            - generic [ref=e189]:
+              - img [ref=e190]
+              - text: Calculated from mapped values
+          - generic [ref=e193]:
+            - generic [ref=e194]:
+              - img [ref=e195]
+              - text: Avg Processing Time
+            - generic [ref=e198]: 0s
+            - generic [ref=e199]:
+              - img [ref=e200]
+              - text: Document processing average
+          - generic [ref=e203]:
+            - generic [ref=e204]:
+              - img [ref=e205]
+              - text: Covenants at Risk
+            - generic [ref=e209]: "0"
+            - generic [ref=e210]:
+              - img [ref=e211]
+              - text: Breached monitoring items
+          - generic [ref=e214]:
+            - generic [ref=e215]:
+              - img [ref=e216]
+              - text: Active Customers
+            - generic [ref=e218]: "5"
+            - generic [ref=e219]:
+              - img [ref=e220]
+              - text: Current customer records
+        - generic [ref=e223]:
+          - generic [ref=e224]:
+            - generic [ref=e226]:
+              - generic [ref=e227]: Spreads Processed
+              - generic [ref=e228]: Monthly trend over last 7 months
+            - application [ref=e231]:
+              - generic [ref=e239]:
+                - generic [ref=e240]:
+                  - generic [ref=e242]: 2025-11
+                  - generic [ref=e244]: 2026-01
+                  - generic [ref=e246]: 2026-04
+                - generic [ref=e247]:
+                  - generic [ref=e249]: "0"
+                  - generic [ref=e251]: "2"
+                  - generic [ref=e253]: "4"
+                  - generic [ref=e255]: "6"
+                  - generic [ref=e257]: "8"
+          - generic [ref=e258]:
+            - generic [ref=e260]:
+              - generic [ref=e261]: Covenant Status Distribution
+              - generic [ref=e262]: From monitoring summary endpoint
+            - application [ref=e266]
+        - generic [ref=e267]:
+          - generic [ref=e268]:
+            - generic [ref=e269]: Recent Spreads
+            - link "View All" [ref=e270] [cursor=pointer]:
+              - /url: /customers
+              - text: View All
+              - img [ref=e271]
+          - table [ref=e273]:
+            - rowgroup [ref=e274]:
+              - row "Customer Date Status AI Accuracy Processing Time" [ref=e275]:
+                - columnheader "Customer" [ref=e276]
+                - columnheader "Date" [ref=e277]
+                - columnheader "Status" [ref=e278]
+                - columnheader "AI Accuracy" [ref=e279]
+                - columnheader "Processing Time" [ref=e280]
+            - rowgroup [ref=e281]:
+              - row "UI Flow Customer 2026-09-30 SUBMITTED 0.00% -" [ref=e282]:
+                - cell "UI Flow Customer" [ref=e283]
+                - cell "2026-09-30" [ref=e284]
+                - cell "SUBMITTED" [ref=e285]:
+                  - generic [ref=e286]: SUBMITTED
+                - cell "0.00%" [ref=e288]
+                - cell "-" [ref=e289]
+              - row "Autotest 0413191114 2026-06-30 SUBMITTED 0.75% -" [ref=e290]:
+                - cell "Autotest 0413191114" [ref=e291]
+                - cell "2026-06-30" [ref=e292]
+                - cell "SUBMITTED" [ref=e293]:
+                  - generic [ref=e294]: SUBMITTED
+                - cell "0.75%" [ref=e296]
+                - cell "-" [ref=e297]
+              - row "Autotest 0413191114 2026-03-31 SUBMITTED 0.00% -" [ref=e298]:
+                - cell "Autotest 0413191114" [ref=e299]
+                - cell "2026-03-31" [ref=e300]
+                - cell "SUBMITTED" [ref=e301]:
+                  - generic [ref=e302]: SUBMITTED
+                - cell "0.00%" [ref=e304]
+                - cell "-" [ref=e305]
+              - row "Test Customer Inc 2026-03-31 DRAFT 0.00% -" [ref=e306]:
+                - cell "Test Customer Inc" [ref=e307]
+                - cell "2026-03-31" [ref=e308]
+                - cell "DRAFT" [ref=e309]:
+                  - generic [ref=e310]: DRAFT
+                - cell "0.00%" [ref=e312]
+                - cell "-" [ref=e313]
+              - row "Test Customer Inc 2025-12-31 SUBMITTED 0.00% -" [ref=e314]:
+                - cell "Test Customer Inc" [ref=e315]
+                - cell "2025-12-31" [ref=e316]
+                - cell "SUBMITTED" [ref=e317]:
+                  - generic [ref=e318]: SUBMITTED
+                - cell "0.00%" [ref=e320]
+                - cell "-" [ref=e321]
+  - button "Open Next.js Dev Tools" [ref=e43] [cursor=pointer]:
+    - img [ref=e44]
+  - alert [ref=e47]
+  - generic [ref=e322]: "0"

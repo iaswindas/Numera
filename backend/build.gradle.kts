@@ -50,6 +50,8 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
 
+    implementation("com.bucket4j:bucket4j-core:8.10.1")
+
     // SSO: OAuth2/OIDC + SAML 2.0
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
 

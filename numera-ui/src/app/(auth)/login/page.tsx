@@ -27,8 +27,8 @@ export default function LoginPage() {
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: 'admin@numera.ai',
-      password: 'Admin@123',
+      email: process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ? 'analyst@numera.ai' : '',
+      password: process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ? 'Password123!' : '',
     },
   })
 

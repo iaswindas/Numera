@@ -57,9 +57,11 @@ class SpreadService(
     private fun resolvedTenantId(): UUID =
         TenantContext.get()?.let { UUID.fromString(it) } ?: TenantAwareEntity.DEFAULT_TENANT
 
+    @Transactional(readOnly = true)
     fun listByCustomer(customerId: UUID): List<SpreadItemResponse> =
         spreadItemRepository.findByCustomerId(customerId).map { it.toResponse() }
 
+    @Transactional(readOnly = true)
     fun get(spreadItemId: UUID): SpreadItemResponse =
         spreadItemRepository.findById(spreadItemId).orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Spread item not found") }.toResponse()
 
@@ -103,6 +105,7 @@ class SpreadService(
         return mappingOrchestrator.processSpread(spreadItem, spreadItem.document)
     }
 
+    @Transactional(readOnly = true)
     fun values(spreadItemId: UUID): List<SpreadValueResponse> = spreadValueRepository.findBySpreadItemId(spreadItemId).map { it.toResponse() }
 
     @Transactional
@@ -265,8 +268,10 @@ class SpreadService(
         )
     }
 
+    @Transactional(readOnly = true)
     fun history(spreadItemId: UUID): VersionHistoryResponse = spreadVersionService.history(spreadItemId)
 
+    @Transactional(readOnly = true)
     fun diff(spreadItemId: UUID, fromVersion: Int, toVersion: Int): DiffResponse =
         spreadVersionService.diff(spreadItemId, fromVersion, toVersion)
 
@@ -361,6 +366,7 @@ class SpreadService(
         )
     }
 
+    @Transactional(readOnly = true)
     fun getVariance(spreadId: UUID, compareSpreadId: UUID): List<SpreadVarianceDto> {
         val spread = spreadItemRepository.findById(spreadId)
             .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Spread item not found") }

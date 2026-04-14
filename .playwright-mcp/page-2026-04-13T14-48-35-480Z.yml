@@ -1,0 +1,38 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e6]: "N"
+      - heading "Numera" [level=1] [ref=e7]
+      - paragraph [ref=e8]: AI-First Financial Spreading Platform
+    - generic [ref=e9]:
+      - button "Sign in with SSO" [ref=e10] [cursor=pointer]:
+        - img [ref=e11]
+        - text: Sign in with SSO
+      - generic [ref=e14]: or continue with credentials
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - generic [ref=e17]: Email Address
+          - textbox "Email Address" [active] [ref=e18]:
+            - /placeholder: analyst@bank.com
+          - generic [ref=e36]: Enter a valid email
+        - generic [ref=e19]:
+          - generic [ref=e20]: Password
+          - generic [ref=e21]:
+            - textbox "Password" [ref=e22]:
+              - /placeholder: ••••••••
+            - button [ref=e23] [cursor=pointer]:
+              - img [ref=e24]
+          - generic [ref=e37]: Password must be at least 8 characters
+        - generic [ref=e27]:
+          - generic [ref=e28] [cursor=pointer]:
+            - checkbox "Remember me" [ref=e29]
+            - text: Remember me
+          - link "Forgot password?" [ref=e30] [cursor=pointer]:
+            - /url: "#"
+        - button "Sign In" [ref=e31] [cursor=pointer]:
+          - img [ref=e32]
+          - text: Sign In
+      - generic [ref=e35]: Protected by Multi-Factor Authentication
+  - button "Open Next.js Dev Tools" [ref=e43] [cursor=pointer]:
+    - img [ref=e44]
+  - alert [ref=e47]

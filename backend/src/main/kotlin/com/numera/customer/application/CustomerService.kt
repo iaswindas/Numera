@@ -11,6 +11,9 @@ import com.numera.shared.audit.AuditAction
 import com.numera.shared.audit.AuditService
 import com.numera.shared.exception.ApiException
 import com.numera.shared.exception.ErrorCode
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageImpl
+import org.springframework.data.domain.Pageable
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -39,6 +42,7 @@ class CustomerService(
         return roles.contains("ROLE_ADMIN") || roles.contains("ROLE_GLOBAL_MANAGER")
     }
 
+    @Transactional(readOnly = true)
     fun findAll(tenantId: UUID, userId: UUID? = null): List<CustomerResponse> {
         val (currentUserId, currentRoles) = getCurrentUserIdAndRoles()
         
@@ -58,7 +62,8 @@ class CustomerService(
         return customers.map { it.toResponse() }
     }
 
-    fun search(tenantId: UUID, request: CustomerSearchRequest, userId: UUID? = null): List<CustomerResponse> {
+    @Transactional(readOnly = true)
+    fun search(tenantId: UUID, request: CustomerSearchRequest, pageable: Pageable? = null, userId: UUID? = null): Page<CustomerResponse> {
         val (currentUserId, currentRoles) = getCurrentUserIdAndRoles()
         
         // Skip group filtering for admin/global manager
@@ -74,9 +79,17 @@ class CustomerService(
         } else {
             customerRepository.search(tenantId, request.query, request.industry, request.country)
         }
-        return customers.map { it.toResponse() }
+        val responses = customers.map { it.toResponse() }
+        return if (pageable != null) {
+            val start = pageable.offset.toInt().coerceAtMost(responses.size)
+            val end = (start + pageable.pageSize).coerceAtMost(responses.size)
+            PageImpl(responses.subList(start, end), pageable, responses.size.toLong())
+        } else {
+            PageImpl(responses)
+        }
     }
 
+    @Transactional(readOnly = true)
     fun findById(id: UUID): CustomerResponse {
         val customer = customerRepository.findById(id)
             .orElseThrow { ApiException(ErrorCode.NOT_FOUND, "Customer not found") }

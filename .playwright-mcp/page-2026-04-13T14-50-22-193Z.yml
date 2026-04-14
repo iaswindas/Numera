@@ -1,0 +1,113 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - button [ref=e6] [cursor=pointer]:
+        - img [ref=e7]
+      - generic [ref=e9]: Spread Workspace
+      - generic [ref=e10]: SUBMITTED
+      - generic [ref=e11]: v2
+      - button "Lock" [ref=e12] [cursor=pointer]:
+        - img [ref=e13]
+        - text: Lock
+      - button "Process" [ref=e16] [cursor=pointer]:
+        - img [ref=e17]
+        - text: Process
+      - button "Accept High" [ref=e20] [cursor=pointer]:
+        - img [ref=e21]
+        - text: Accept High
+      - button "Historical" [ref=e24] [cursor=pointer]:
+        - img [ref=e25]
+        - text: Historical
+      - button "Split" [ref=e28] [cursor=pointer]:
+        - img [ref=e29]
+        - text: Split
+      - button "Submit" [ref=e31] [cursor=pointer]:
+        - img [ref=e32]
+        - text: Submit
+    - generic [ref=e35]:
+      - generic [ref=e36]: "Statement: 2026-09-30"
+      - generic [ref=e37]: "High: 0"
+      - generic [ref=e38]: "Medium: 0"
+      - generic [ref=e39]: "Low: 2"
+      - generic [ref=e40]: "Total: 2"
+    - generic [ref=e41]:
+      - generic [ref=e43]:
+        - generic [ref=e45]:
+          - button "Rotate" [ref=e46] [cursor=pointer]:
+            - img [ref=e47]
+            - text: Rotate
+          - button "Split" [ref=e50] [cursor=pointer]:
+            - img [ref=e51]
+            - text: Split
+          - button "Merge" [ref=e57] [cursor=pointer]:
+            - img [ref=e58]
+            - text: Merge
+          - button "Clean" [ref=e62] [cursor=pointer]:
+            - img [ref=e63]
+            - text: Clean
+        - generic [ref=e67]:
+          - generic [ref=e68]:
+            - button "Previous page" [disabled] [ref=e69]:
+              - img [ref=e70]
+            - generic [ref=e72]: 1 / 1
+            - button "Next page" [disabled] [ref=e73]:
+              - img [ref=e74]
+            - button "Hide Zones" [ref=e76] [cursor=pointer]:
+              - img [ref=e77]
+              - text: Hide Zones
+            - button "Zoom in" [ref=e82] [cursor=pointer]:
+              - img [ref=e83]
+            - generic [ref=e86]: 100%
+            - button "Zoom out" [ref=e87] [cursor=pointer]:
+              - img [ref=e88]
+            - link "Open in new tab" [ref=e91] [cursor=pointer]:
+              - /url: /api/documents/e57f29a5-6173-4c44-9ea3-65cb98237397/download
+              - img [ref=e92]
+          - iframe [ref=e99]:
+            - generic [ref=f3e3]:
+              - strong [ref=f3e4]: localhost
+              - text: refused to connect.
+      - generic [ref=e100]:
+        - generic [ref=e101]:
+          - button "Spread Values" [ref=e102] [cursor=pointer]:
+            - img [ref=e103]
+            - text: Spread Values
+          - button "Validation" [ref=e106] [cursor=pointer]:
+            - img [ref=e107]
+            - text: Validation
+          - button "Comments" [ref=e109] [cursor=pointer]:
+            - img [ref=e110]
+            - text: Comments
+          - button "History" [ref=e112] [cursor=pointer]:
+            - img [ref=e113]
+            - text: History
+        - generic [ref=e117]:
+          - generic [ref=e118]:
+            - generic [ref=e119] [cursor=pointer]:
+              - checkbox "Showing All Rows" [ref=e120]
+              - generic [ref=e121]: Showing All Rows
+            - generic [ref=e122] [cursor=pointer]:
+              - checkbox "Show Variance" [ref=e123]
+              - generic [ref=e124]: Show Variance
+            - generic [ref=e125] [cursor=pointer]:
+              - checkbox "SmartFill" [ref=e126]
+              - generic [ref=e127]: SmartFill
+            - generic [ref=e128] [cursor=pointer]:
+              - checkbox "Currency" [ref=e129]
+              - generic [ref=e130]: Currency
+          - generic [ref=e132]:
+            - button "All" [ref=e133] [cursor=pointer]
+            - button "Cost of Goods Sold" [ref=e154] [cursor=pointer]
+            - button "Revenue" [ref=e155] [cursor=pointer]
+  - generic [ref=e140] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e141]:
+      - img [ref=e142]
+    - generic [ref=e145]:
+      - button "Open issues overlay" [ref=e146]:
+        - generic [ref=e147]:
+          - generic [ref=e148]: "0"
+          - generic [ref=e149]: "1"
+        - generic [ref=e150]: Issue
+      - button "Collapse issues badge" [ref=e151]:
+        - img [ref=e152]
+  - alert [ref=e4]

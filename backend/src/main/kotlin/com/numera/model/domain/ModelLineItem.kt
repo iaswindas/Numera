@@ -2,6 +2,7 @@ package com.numera.model.domain
 
 import com.numera.shared.domain.BaseEntity
 import jakarta.persistence.Column
+import org.hibernate.annotations.ColumnTransformer
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
@@ -51,6 +52,7 @@ class ModelLineItem : BaseEntity() {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
+    @ColumnTransformer(write = "?::jsonb")
     var aliasesJson: String? = null
 
     @Column(nullable = false)

@@ -5,6 +5,7 @@ import com.numera.covenant.dto.CheckerDecisionRequest
 import com.numera.covenant.dto.CovenantDocumentResponse
 import com.numera.covenant.dto.CovenantMonitoringItemResponse
 import com.numera.covenant.dto.ManualValueRequest
+import jakarta.validation.Valid
 import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
@@ -68,7 +69,7 @@ class CovenantMonitoringController(
     @PutMapping("/{id}/manual-value")
     fun setManualValue(
         @PathVariable id: UUID,
-        @RequestBody request: ManualValueRequest,
+        @Valid @RequestBody request: ManualValueRequest,
     ): CovenantMonitoringItemResponse = monitoringService.setManualValue(id, request)
 
     /** Upload compliance document for non-financial covenant */
@@ -84,7 +85,7 @@ class CovenantMonitoringController(
     @PostMapping("/{id}/checker-decision")
     fun checkerDecision(
         @PathVariable id: UUID,
-        @RequestBody request: CheckerDecisionRequest,
+        @Valid @RequestBody request: CheckerDecisionRequest,
         @RequestParam actorId: UUID,
     ): CovenantMonitoringItemResponse = monitoringService.checkerDecision(id, request, actorId)
 

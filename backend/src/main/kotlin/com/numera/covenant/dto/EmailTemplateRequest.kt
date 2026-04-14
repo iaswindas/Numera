@@ -1,11 +1,13 @@
 package com.numera.covenant.dto
 
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Size
 import java.util.UUID
 
 data class EmailTemplateRequest(
-    val name: String,
-    val covenantType: String? = null,
-    val templateCategory: String? = null,
-    val subject: String? = null,
-    val bodyHtml: String,
+    @field:NotBlank @field:Size(max = 200) val name: String,
+    @field:Size(max = 50) val covenantType: String? = null,
+    @field:Size(max = 50) val templateCategory: String? = null,
+    @field:Size(max = 200) val subject: String? = null,
+    @field:NotBlank val bodyHtml: String,
 )

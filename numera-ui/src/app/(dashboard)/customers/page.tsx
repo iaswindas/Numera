@@ -5,6 +5,15 @@ import Link from 'next/link'
 import { Building2, Plus, Search } from 'lucide-react'
 import { useCreateCustomer, useCustomers } from '@/services/customerApi'
 import { useToast } from '@/components/ui/Toast'
+import { z } from 'zod'
+
+const customerSchema = z.object({
+  customerCode: z.string().min(1, 'Customer code is required').max(50, 'Customer code too long'),
+  name: z.string().min(1, 'Name is required').max(200, 'Name too long'),
+  industry: z.string().max(100, 'Industry too long').optional(),
+  country: z.string().max(10, 'Country code too long').optional(),
+  relationshipManager: z.string().max(200, 'Relationship manager name too long').optional(),
+})
 
 export default function CustomersPage() {
   const { showToast } = useToast()
@@ -22,18 +31,19 @@ export default function CustomersPage() {
   const customers = useMemo(() => customersQuery.data ?? [], [customersQuery.data])
 
   const onCreate = async () => {
-    if (!customerCode || !name) {
-      showToast('Customer code and name are required', 'error')
+    const result = customerSchema.safeParse({
+      customerCode,
+      name,
+      industry: industry || undefined,
+      country: country || undefined,
+      relationshipManager: relationshipManager || undefined,
+    })
+    if (!result.success) {
+      showToast(result.error.issues[0].message, 'error')
       return
     }
     try {
-      await createCustomer.mutateAsync({
-        customerCode,
-        name,
-        industry: industry || undefined,
-        country: country || undefined,
-        relationshipManager: relationshipManager || undefined,
-      })
+      await createCustomer.mutateAsync(result.data)
       showToast('Customer created', 'success')
       setShowCreate(false)
       setCustomerCode('')
@@ -111,11 +121,11 @@ export default function CustomersPage() {
           <div className="modal" style={{ maxWidth: 520 }}>
             <div className="card-title">Create Customer</div>
             <div className="grid-2" style={{ marginTop: 12 }}>
-              <div className="input-group"><label>Customer Code</label><input className="input" value={customerCode} onChange={(e) => setCustomerCode(e.target.value)} /></div>
-              <div className="input-group"><label>Name</label><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></div>
-              <div className="input-group"><label>Industry</label><input className="input" value={industry} onChange={(e) => setIndustry(e.target.value)} /></div>
-              <div className="input-group"><label>Country</label><input className="input" value={country} onChange={(e) => setCountry(e.target.value)} /></div>
-              <div className="input-group" style={{ gridColumn: '1 / span 2' }}><label>Relationship Manager</label><input className="input" value={relationshipManager} onChange={(e) => setRelationshipManager(e.target.value)} /></div>
+              <div className="input-group"><label>Customer Code</label><input className="input" value={customerCode} onChange={(e) => setCustomerCode(e.target.value)} maxLength={50} /></div>
+              <div className="input-group"><label>Name</label><input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={200} /></div>
+              <div className="input-group"><label>Industry</label><input className="input" value={industry} onChange={(e) => setIndustry(e.target.value)} maxLength={100} /></div>
+              <div className="input-group"><label>Country</label><input className="input" value={country} onChange={(e) => setCountry(e.target.value)} maxLength={10} /></div>
+              <div className="input-group" style={{ gridColumn: '1 / span 2' }}><label>Relationship Manager</label><input className="input" value={relationshipManager} onChange={(e) => setRelationshipManager(e.target.value)} maxLength={200} /></div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
               <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>Cancel</button>

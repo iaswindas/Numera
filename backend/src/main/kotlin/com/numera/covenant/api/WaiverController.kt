@@ -5,6 +5,7 @@ import com.numera.covenant.application.WaiverLetterResult
 import com.numera.covenant.dto.WaiverGenerationRequest
 import com.numera.covenant.dto.WaiverLetterResponse
 import com.numera.covenant.dto.WaiverRequest
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -33,7 +34,7 @@ class WaiverController(
      */
     @PostMapping
     fun processWaiver(
-        @RequestBody request: WaiverRequest,
+        @Valid @RequestBody request: WaiverRequest,
         @RequestParam actorId: UUID,
     ): WaiverLetterResult = waiverService.processWaiver(request, actorId)
 
@@ -46,7 +47,7 @@ class WaiverController(
     @PostMapping("/generate")
     @ResponseStatus(HttpStatus.CREATED)
     fun generateWaiverLetter(
-        @RequestBody request: WaiverGenerationRequest,
+        @Valid @RequestBody request: WaiverGenerationRequest,
         @RequestParam actorId: UUID,
     ): WaiverLetterResponse = waiverService.generateWaiverLetter(request, actorId)
 

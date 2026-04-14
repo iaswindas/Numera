@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Undo, Redo, Copy, Eye, EyeOff } from 'lucide-react'
 import VariableInserter, { TEMPLATE_VARIABLES } from './VariableInserter'
+import { sanitizeHtml } from '@/utils/sanitize'
 
 type TemplateEditorProps = {
   value: string
@@ -29,7 +30,7 @@ export default function TemplateEditor({ value, onChange, category }: TemplateEd
 
   useEffect(() => {
     if (editorRef.current && !isInternalUpdate.current) {
-      editorRef.current.innerHTML = value
+      editorRef.current.innerHTML = sanitizeHtml(value)
     }
     isInternalUpdate.current = false
   }, [value])
@@ -217,7 +218,7 @@ export default function TemplateEditor({ value, onChange, category }: TemplateEd
               Preview with Sample Data
             </div>
             <div
-              dangerouslySetInnerHTML={{ __html: resolveSampleData(value) }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(resolveSampleData(value)) }}
               style={{ fontSize: 14, lineHeight: 1.6 }}
             />
           </div>

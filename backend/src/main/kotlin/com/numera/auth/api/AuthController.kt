@@ -17,6 +17,7 @@ import com.numera.auth.dto.RegisterRequest
 import com.numera.auth.dto.RegisterResponse
 import com.numera.auth.dto.SsoCallbackRequest
 import com.numera.auth.dto.SsoConfigResponse
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
@@ -54,8 +55,11 @@ class AuthController(
     fun me(authentication: Authentication): AuthMeResponse = authService.me(authentication.name)
 
     @PostMapping("/logout")
-    fun logout(authentication: Authentication) {
-        authService.logout(authentication.name)
+    fun logout(authentication: Authentication, request: HttpServletRequest) {
+        val token = request.getHeader("Authorization")
+            ?.takeIf { it.startsWith("Bearer ") }
+            ?.substringAfter("Bearer ")
+        authService.logout(authentication.name, token)
     }
 
     @PostMapping("/force-logout/{userId}")

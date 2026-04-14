@@ -4,16 +4,20 @@ import com.numera.shared.config.NumeraProperties
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.security.core.Authentication
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.stereotype.Component
+import java.security.MessageDigest
+import java.time.Duration
 import java.util.Date
 import javax.crypto.SecretKey
 
 @Component
 class JwtTokenProvider(
     private val config: NumeraProperties,
+    private val redisTemplate: StringRedisTemplate,
 ) {
     private val key: SecretKey = run {
         val normalized = config.jwt.secret.trim()
@@ -63,8 +67,22 @@ class JwtTokenProvider(
 
     fun isValid(token: String): Boolean = runCatching {
         val claims = parseClaims(token)
-        claims.expiration.after(Date())
+        if (claims.expiration.before(Date())) return false
+        val hash = MessageDigest.getInstance("SHA-256").digest(token.toByteArray()).joinToString("") { "%02x".format(it) }
+        if (redisTemplate.hasKey("numera:jwt:blacklist:$hash") == true) return false
+        true
     }.getOrDefault(false)
+
+    fun blacklistToken(token: String) {
+        runCatching {
+            val claims = parseClaims(token)
+            val remainingMs = claims.expiration.time - System.currentTimeMillis()
+            if (remainingMs > 0) {
+                val hash = MessageDigest.getInstance("SHA-256").digest(token.toByteArray()).joinToString("") { "%02x".format(it) }
+                redisTemplate.opsForValue().set("numera:jwt:blacklist:$hash", "1", Duration.ofMillis(remainingMs))
+            }
+        }
+    }
 
     fun getAuthentication(token: String): Authentication {
         val claims = parseClaims(token)

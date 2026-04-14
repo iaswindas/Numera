@@ -2,6 +2,7 @@
 
 import { useRef } from 'react'
 import { Printer, Mail, Download } from 'lucide-react'
+import { sanitizeHtml } from '@/utils/sanitize'
 
 type LetterPreviewProps = {
   subject: string
@@ -20,9 +21,9 @@ export default function LetterPreview({ subject, content, onChange, onPrint, onS
       const printWindow = window.open('', '_blank')
       if (printWindow) {
         printWindow.document.write(`
-          <!DOCTYPE html><html><head><title>${subject || 'Waiver Letter'}</title>
+          <!DOCTYPE html><html><head><title>${sanitizeHtml(subject || 'Waiver Letter')}</title>
           <style>body{font-family:Arial,sans-serif;padding:40px;line-height:1.6;color:#1a1a1a}</style>
-          </head><body>${content}</body></html>
+          </head><body>${sanitizeHtml(content)}</body></html>
         `)
         printWindow.document.close()
         printWindow.print()
@@ -87,7 +88,7 @@ export default function LetterPreview({ subject, content, onChange, onPrint, onS
           </div>
           <div
             ref={previewRef}
-            dangerouslySetInnerHTML={{ __html: content }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
             style={{
               flex: 1,
               padding: 24,

@@ -9,11 +9,17 @@ ALTER TABLE users
 -- Create enum type for account status
 CREATE TYPE account_status_enum AS ENUM ('PENDING', 'ACTIVE', 'INACTIVE', 'REJECTED');
 
--- Must drop default before type conversion, then re-add it
-ALTER TABLE users ALTER COLUMN account_status DROP DEFAULT;
+-- Drop the VARCHAR default before type conversion
+ALTER TABLE users
+    ALTER COLUMN account_status DROP DEFAULT;
+
+-- Update column to use enum type
 ALTER TABLE users
     ALTER COLUMN account_status TYPE account_status_enum USING account_status::account_status_enum;
-ALTER TABLE users ALTER COLUMN account_status SET DEFAULT 'ACTIVE';
+
+-- Re-add default as enum value
+ALTER TABLE users
+    ALTER COLUMN account_status SET DEFAULT 'ACTIVE'::account_status_enum;
 
 -- Create index for account status queries
 CREATE INDEX idx_users_account_status ON users(account_status);
